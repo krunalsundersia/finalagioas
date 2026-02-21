@@ -193,10 +193,13 @@ export const dashboardAPI = {
 
 export const sessionAPI = {
   // Start session (checks membership automatically on backend)
+  // simulation_type must be the combined key e.g. 'vc_chat', 'boardroom_3d'
+  // sent at the TOP LEVEL so the backend can find it in request.data.get('simulation_type')
   start: (simulationType, interfaceMode, userData) => {
     const endpoint = `${simulationType}/${interfaceMode}/sessions/start/`;
+    const combinedType = `${simulationType}_${interfaceMode}`;
     return apiClient.post(endpoint, {
-      simulation_type: simulationType,
+      simulation_type: combinedType,
       interface_mode: interfaceMode,
       user_data: userData,
     });
@@ -381,3 +384,55 @@ export const healthCheck = () => {
 };
 
 export default apiClient;
+// ============================================================================
+// SESSION HISTORY & ANALYTICS API (NEW — Neon DB powered)
+// ============================================================================
+
+export const historyAPI = {
+  // Get all messages for a session
+  getSessionMessages: (sessionId) => {
+    return apiClient.get(`sessions/${sessionId}/messages/`);
+  },
+
+  // Get all sessions for current user (with frontpage config + message count)
+  getMySessions: (params = {}) => {
+    return apiClient.get('sessions/my/', { params });
+  },
+
+  // Get frontpage config for a session
+  getSessionConfig: (sessionId) => {
+    return apiClient.get(`sessions/${sessionId}/config/`);
+  },
+
+  // Get full event audit trail for a session
+  getSessionEvents: (sessionId) => {
+    return apiClient.get(`sessions/${sessionId}/events/`);
+  },
+
+  // Get all events for current user (login times, simulations, durations)
+  getMyEvents: (params = {}) => {
+    return apiClient.get('events/my/', { params });
+  },
+
+  // Get aggregate usage stats
+  getMyStats: () => {
+    return apiClient.get('stats/my/');
+  },
+};
+
+// ============================================================================
+// FRONTPAGE CONFIG — Save config before launching simulation
+// (Call this from each frontpage's handleStart/handleLaunch before sessionAPI.start)
+// ============================================================================
+
+export const frontpageAPI = {
+  // Save frontpage form data (called automatically inside sessionAPI.start
+  // on the backend — this is available if you need to call it manually)
+  save: (sessionId, simulationSource, configData) => {
+    return apiClient.post('frontpage/save/', {
+      session_id: sessionId,
+      simulation_source: simulationSource,
+      config: configData,
+    });
+  },
+};

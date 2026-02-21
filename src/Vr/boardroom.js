@@ -846,7 +846,7 @@ const MemberInfoPanel = ({ members, currentSpeaker, speakingCharacter, onClose, 
           )
         })}
       </div>
-      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } } @keyframes dotPulse { 0%, 100% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.4); opacity: 1; } }`}</style>
     </div>
   );
 };
@@ -1031,6 +1031,8 @@ const Boardroom = ({ onBack, meetingTopic = "Strategic Discussion", meetingAim =
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [activeUsers, setActiveUsers] = useState(1);
   const [currentMessageBuffer, setCurrentMessageBuffer] = useState("");
+  const [isAiThinking, setIsAiThinking] = useState(false);
+  const [thinkingName, setThinkingName] = useState("");
   const wsRef = useRef(null);
   const abuseCheckRef = useRef(0);
 
@@ -1165,10 +1167,13 @@ const Boardroom = ({ onBack, meetingTopic = "Strategic Discussion", meetingAim =
       setCurrentSpeaker(data.character_name);
       setSpeakingCharacter(null); // Not speaking yet
       setCurrentMessageBuffer("");
+      setIsAiThinking(true);
+      setThinkingName(data.character_name || "Board");
     }
 
     else if (data.type === 'word_stream') {
       const { character_name, word, is_complete, animation, emotion } = data;
+      setIsAiThinking(false);
 
       // Start speaking animation on first word
       if (!speakingCharacter && character_name) {
@@ -1184,6 +1189,7 @@ const Boardroom = ({ onBack, meetingTopic = "Strategic Discussion", meetingAim =
         // Update transcript on complete
         if (is_complete) {
           console.log(`✅ ${character_name} finished speaking`);
+          setIsAiThinking(false);
           setTranscript(prevTrans => [...prevTrans, {
             sender: character_name,
             text: newMessage,
@@ -1477,12 +1483,39 @@ const Boardroom = ({ onBack, meetingTopic = "Strategic Discussion", meetingAim =
               <X size={16} color="#9C8C74" onClick={() => setShowTranscript(false)} style={{ cursor: 'pointer' }} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 16, gap: 16, display: 'flex', flexDirection: 'column' }}>
-              {transcript.map((t, i) => (
-                <div key={i} style={{ padding: 12, background: 'rgba(0,0,0,0.2)', borderRadius: 6, borderLeft: `3px solid ${t.sender === "You" ? '#D4AF68' : t.sender === "System" ? '#8A3A3A' : '#5D7A58'}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: t.sender === "You" ? '#D4AF68' : t.sender === "System" ? '#E63946' : '#E8E0D5', fontSize: 12, fontWeight: 700 }}>{t.sender}</span><span style={{ color: '#5E4F40', fontSize: 10 }}>{t.time}</span></div>
-                  <div style={{ fontSize: 12, color: '#9C8C74', lineHeight: '1.5' }}>{t.text}</div>
+              {transcript.map((t, i) => {
+                const charConfig = CHAR_CONFIG.find(c => c.name === t.sender);
+                return (
+                  <div key={i} style={{ padding: 12, background: 'rgba(0,0,0,0.2)', borderRadius: 6, borderLeft: `3px solid ${t.sender === "You" ? '#D4AF68' : t.sender === "System" ? '#8A3A3A' : '#5D7A58'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      {t.sender !== "You" && t.sender !== "System" && (
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(212,175,104,0.2)', border: '1px solid #D4AF68', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#D4AF68', fontWeight: 700, flexShrink: 0 }}>
+                          {t.sender.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flex: 1 }}>
+                        <span style={{ color: t.sender === "You" ? '#D4AF68' : t.sender === "System" ? '#E63946' : '#E8E0D5', fontSize: 12, fontWeight: 700 }}>{t.sender}</span>
+                        <span style={{ color: '#5E4F40', fontSize: 10 }}>{t.time}</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9C8C74', lineHeight: '1.5' }}>{t.text}</div>
+                  </div>
+                );
+              })}
+              {isAiThinking && (
+                <div style={{ padding: 12, background: 'rgba(212,175,104,0.05)', borderRadius: 6, borderLeft: '3px solid #D4AF68', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(212,175,104,0.2)', border: '1px solid #D4AF68', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#D4AF68', fontWeight: 700 }}>
+                    {thinkingName.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: '#D4AF68', fontSize: 11, fontWeight: 600 }}>{thinkingName}</span>
+                    <span style={{ color: '#9C8C74', fontSize: 11, fontStyle: 'italic' }}>is analyzing...</span>
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF68', animation: `dotPulse 1.2s infinite ease-in-out ${i * 0.2}s` }} />)}
+                    </div>
+                  </div>
                 </div>
-              ))}
+              )}
               <div ref={transcriptEndRef} />
             </div>
           </div>
@@ -1549,17 +1582,130 @@ const Boardroom = ({ onBack, meetingTopic = "Strategic Discussion", meetingAim =
   }
 
   if (showReport) {
+    const sessionDuration = formatTime(3600 - sessionTime);
+    const agentMessages = transcript.filter(t => t.sender !== "You" && t.sender !== "System");
+    const userMessages = transcript.filter(t => t.sender === "You");
+    const speakerStats = {};
+    agentMessages.forEach(m => { speakerStats[m.sender] = (speakerStats[m.sender] || 0) + 1; });
+
+    const downloadTranscript = () => {
+      const lines = transcript.map(t => `[${t.time}] ${t.sender}: ${t.text}`).join('\n');
+      const content = `AGIOAS BOARDROOM - MEETING TRANSCRIPT\n${'='.repeat(50)}\nDate: ${new Date().toLocaleDateString()}\nDuration: ${sessionDuration}\nTopic: ${title}\nAim: ${aim}\n${'='.repeat(50)}\n\n${lines}`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'boardroom_transcript.txt'; a.click();
+    };
+
+    const downloadMoM = () => {
+      const agentLines = agentMessages.map(m => `• [${m.sender}]: ${m.text}`).join('\n');
+      const userLines = userMessages.map(m => `• ${m.text}`).join('\n');
+      const tasks = agentMessages.slice(-5).map((m, i) => `${i + 1}. Follow up on: "${m.text.substring(0, 80)}..."`).join('\n');
+      const content = `AGIOAS BOARDROOM - MINUTES OF MEETING\n${'='.repeat(50)}\nMeeting Title: ${title}\nDate: ${new Date().toLocaleDateString()}\nDuration: ${sessionDuration}\nObjective: ${aim}\n${'='.repeat(50)}\n\nATTENDANCE\n----------\n${Object.keys(speakerStats).map(n => `• ${n} (${CHAR_CONFIG.find(c => c.name === n)?.role || 'Executive'})`).join('\n')}\n\nDISCUSSION POINTS\n-----------------\n${agentLines}\n\nUSER CONTRIBUTIONS\n------------------\n${userLines}\n\nACTION ITEMS\n------------\n${tasks}\n\n${'='.repeat(50)}\nGenerated by AGIOAS AI Boardroom\n`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'minutes_of_meeting.txt'; a.click();
+    };
+
+    const downloadReport = () => {
+      const avgSupport = Math.round(executiveStates.reduce((s, e) => s + (e.supportLevel || 50), 0) / Math.max(executiveStates.length, 1));
+      const avgEngagement = Math.round(executiveStates.reduce((s, e) => s + (e.engagement || 50), 0) / Math.max(executiveStates.length, 1));
+      const content = `AGIOAS BOARDROOM - EXECUTIVE REPORT\n${'='.repeat(50)}\nMeeting: ${title}\nDate: ${new Date().toLocaleDateString()}\nDuration: ${sessionDuration}\n${'='.repeat(50)}\n\nEXECUTIVE SUMMARY\n-----------------\nObjective: ${aim}\nTotal Messages: ${transcript.length}\nBoard Responses: ${agentMessages.length}\nUser Inputs: ${userMessages.length}\n\nPERFORMANCE METRICS\n-------------------\nAverage Board Support: ${avgSupport}%\nAverage Engagement: ${avgEngagement}%\nSession Completion: 100%\n\nSPEAKER BREAKDOWN\n-----------------\n${Object.entries(speakerStats).map(([n, c]) => `• ${n}: ${c} contributions`).join('\n')}\n\nKEY DISCUSSION HIGHLIGHTS\n-------------------------\n${agentMessages.slice(0, 8).map(m => `[${m.sender}] ${m.text}`).join('\n\n')}\n\n${'='.repeat(50)}\nGenerated by AGIOAS AI Boardroom\n`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'boardroom_executive_report.txt'; a.click();
+    };
+
     return (
-      <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: '#E8E0D5', background: '#1A120E', padding: 40, borderRadius: 12, border: '1px solid rgba(196,168,111,0.2)' }}>
-          <PremiumLogo size={48} />
-          <h1 style={{ fontFamily: 'serif', margin: '20px 0 10px 0' }}>SESSION CONCLUDED</h1>
-          <p style={{ color: '#9C8C74', marginBottom: 30 }}>Session duration: {formatTime(3600 - sessionTime)}</p>
-          <button onClick={() => {
-            window.location.reload();
-          }} style={{ background: '#D4AF68', color: '#1A120E', border: 'none', padding: '12px 24px', borderRadius: 4, fontWeight: 'bold', cursor: 'pointer' }}>
-            Start New Session
-          </button>
+      <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', zIndex: 100, overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 20px' }}>
+        <div style={{ width: '100%', maxWidth: 800, background: '#1A120E', border: '1px solid rgba(196,168,111,0.3)', borderRadius: 12, padding: 40, boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <img src="/logo.png" alt="AGIOAS" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 16 }} />
+            <h1 style={{ fontFamily: 'serif', margin: '0 0 8px 0', color: '#E8E0D5', fontSize: 28, letterSpacing: '0.1em' }}>BOARDROOM SESSION COMPLETE</h1>
+            <p style={{ color: '#9C8C74', margin: 0 }}>{title} · Duration: {sessionDuration}</p>
+          </div>
+
+          {/* Stats Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 32 }}>
+            {[
+              { label: 'Total Messages', value: transcript.length, color: '#D4AF68' },
+              { label: 'Board Responses', value: agentMessages.length, color: '#5D7A58' },
+              { label: 'Your Inputs', value: userMessages.length, color: '#4A90E2' }
+            ].map((stat, i) => (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: 20, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                <div style={{ color: '#9C8C74', fontSize: 11, fontWeight: 600, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Speaker Breakdown */}
+          {Object.keys(speakerStats).length > 0 && (
+            <div style={{ marginBottom: 32 }}>
+              <h3 style={{ color: '#D4AF68', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Board Participation</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Object.entries(speakerStats).map(([name, count]) => {
+                  const cfg = CHAR_CONFIG.find(c => c.name === name);
+                  const pct = Math.round((count / agentMessages.length) * 100);
+                  return (
+                    <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(212,175,104,0.15)', border: '1px solid rgba(212,175,104,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D4AF68', fontSize: 10, fontWeight: 700 }}>{name.substring(0, 2).toUpperCase()}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ color: '#E8E0D5', fontSize: 12, fontWeight: 600 }}>{name} <span style={{ color: '#5E4F40', fontSize: 10 }}>({cfg?.role || 'Executive'})</span></span>
+                          <span style={{ color: '#D4AF68', fontSize: 12 }}>{count} contributions</span>
+                        </div>
+                        <div style={{ height: 4, background: 'rgba(0,0,0,0.4)', borderRadius: 2 }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: '#D4AF68', borderRadius: 2 }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Transcript Preview */}
+          <div style={{ marginBottom: 32 }}>
+            <h3 style={{ color: '#D4AF68', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Transcript Preview</h3>
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 6, padding: 16, maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {transcript.slice(-8).map((t, i) => (
+                <div key={i} style={{ fontSize: 12, borderLeft: `2px solid ${t.sender === "You" ? '#D4AF68' : t.sender === "System" ? '#8A3A3A' : '#5D7A58'}`, paddingLeft: 8 }}>
+                  <span style={{ color: t.sender === "You" ? '#D4AF68' : '#9C8C74', fontWeight: 700 }}>{t.sender}: </span>
+                  <span style={{ color: '#7A6A5A' }}>{t.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Download Buttons */}
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ color: '#D4AF68', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Download Documents</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Minutes of Meeting (MoM)', icon: FileText, fn: downloadMoM, desc: 'Full meeting minutes with action items' },
+                { label: 'Executive Report', icon: FileBarChart, fn: downloadReport, desc: 'Performance metrics & highlights' },
+                { label: 'Full Transcript', icon: Download, fn: downloadTranscript, desc: 'Complete conversation log' },
+              ].map((btn, i) => (
+                <button key={i} onClick={btn.fn} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(196,168,111,0.2)', borderRadius: 6, color: '#E8E0D5', cursor: 'pointer', fontSize: 14, transition: 'all 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,104,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <btn.icon size={18} color='#D4AF68' />
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 600 }}>{btn.label}</div>
+                      <div style={{ fontSize: 11, color: '#9C8C74', marginTop: 2 }}>{btn.desc}</div>
+                    </div>
+                  </div>
+                  <Download size={16} color='#9C8C74' />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={() => window.location.reload()} style={{ background: '#D4AF68', color: '#1A120E', border: 'none', padding: '14px 32px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 13, letterSpacing: '0.05em' }}>
+              Start New Session
+            </button>
+          </div>
         </div>
       </div>
     );

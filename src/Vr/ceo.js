@@ -13,6 +13,7 @@ import {
 
 // --- BACKEND API URL (CORRECTED) ---
 const BACKEND_API_URL = "http://localhost:8000/api/v1";
+const WS_BASE_URL = "ws://localhost:8000/ws";
 
 // --- TTS VOICES CONFIGURATION ---
 const TTS_VOICES = [
@@ -451,6 +452,8 @@ const Vcs = ({ activeSim, onBack }) => {
 
   const [simMode] = useState("ceo"); // Always CEO mode
   const [sessionId, setSessionId] = useState(null);
+  const wsRef = useRef(null);
+  const handleMessageRef = useRef(null);
   const [isMeetingStarted, setIsMeetingStarted] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -521,7 +524,36 @@ const Vcs = ({ activeSim, onBack }) => {
         setSessionId(authenticatedSessionId);
         console.log('✅ Authenticated session started:', authenticatedSessionId);
 
-        // [KEEP ALL YOUR ORIGINAL 3D SCENE INITIALIZATION CODE BELOW HERE]
+        // Connect WebSocket for real-time AI responses
+        const ws = new WebSocket(`${WS_BASE_URL}/ceo/3d/${authenticatedSessionId}/`);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('✅ CEO 3D WebSocket connected');
+          // Send company context
+          ws.send(JSON.stringify({
+            type: 'company_context',
+            context: {
+              title: 'CEO Strategy Session',
+              businessStage: 'growth',
+              businessState: 'scaling',
+              mentalState: 'focused',
+              teamState: 'aligned',
+              confidence: 70,
+              pressure: { board: 50, investor: 50, market: 50, team: 50 },
+            }
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (handleMessageRef.current) handleMessageRef.current(data);
+          } catch (e) { console.warn('WS parse error', e); }
+        };
+
+        ws.onclose = () => console.log('CEO 3D WebSocket closed');
+        ws.onerror = (e) => console.error('CEO 3D WebSocket error', e);
 
         // Get initial message from backend
         const initialMsg = response.data.initial_message?.message || "Welcome. I'm here to help you think through your biggest challenges and opportunities. What's on your mind today?";
@@ -550,7 +582,10 @@ const Vcs = ({ activeSim, onBack }) => {
     };
 
     initializeAuthenticatedSession();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      if (wsRef.current) wsRef.current.close();
+    };
   }, [progress]);
 
   const speakText = (text, onEndCallback) => {
@@ -638,82 +673,121 @@ const Vcs = ({ activeSim, onBack }) => {
     setResponseTimer(300);
     setIsThinking(true);
 
-    try {
-      console.log('📤 Sending message to backend:', messageToSend);
-
-      const response = await fetch(`${BACKEND_API_URL}/sessions/${sessionId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageToSend,
-          session_id: sessionId
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend error ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Received backend response:', data);
-
+    // Send via WebSocket
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'user_message',
+        message: messageToSend
+      }));
+      console.log('📤 Sent via WebSocket:', messageToSend);
+    } else {
+      console.warn('⚠️ WebSocket not open, cannot send');
       setIsThinking(false);
-
-      // Extract response data
-      const responseText = data.message || "I understand. Tell me more.";
-      const characterName = "CEO Coach";
-
-      // IMPORTANT: Use animation from backend if available, otherwise detect
-      let detectedAnimation = data.animation || detectCeoAnimation(responseText);
-
-      console.log(`🎭 Animation: ${detectedAnimation} for message: "${responseText.substring(0, 50)}..."`);
-
-      // Update animation and speaker
-      setCurrentSpeaker(characterName);
-      setCurrentAnimation(detectedAnimation);
-
-      // LIVE UPDATE METRICS FROM BACKEND
-      if (data.metrics) {
-        console.log('📊 Updating metrics:', data.metrics);
-
-        setBoardMetrics({
-          visionary: Math.round(data.metrics.clarity || 50),
-          strategy: Math.round(100 - (data.metrics.pressure || 50)), // Inverse of pressure
-          critical: Math.round(data.metrics.confidence || 50),
-          persuasion: Math.round(data.metrics.energy || 50),
-          marketFit: Math.round((data.metrics.clarity + data.metrics.confidence) / 2 || 50)
-        });
-
-        // Update accuracy score
-        setAccuracyScore(Math.round(data.metrics.confidence || 65));
-      }
-
-      // Add to transcript
-      setTranscript(prev => [...prev, {
-        sender: characterName,
-        text: responseText,
-        time: timeStamp
-      }]);
-
-      // Speak the response
-      speakText(responseText, () => {
-        setCurrentSpeaker(null);
-        setCurrentAnimation("Idle");
-      });
-
-    } catch (error) {
-      console.error('❌ Chat error:', error);
-      setIsThinking(false);
-
-      // Fallback response
-      const replyText = "I'm listening. Continue.";
-      setTranscript(prev => [...prev, { sender: "CEO Coach", text: replyText, time: timeStamp }]);
-      setCurrentSpeaker("CEO Coach");
-      setCurrentAnimation("Talk");
-      speakText(replyText, () => { setCurrentSpeaker(null); setCurrentAnimation("Idle"); });
     }
 
     if (inputRef.current) inputRef.current.style.height = '48px';
+
+    // Handle incoming WebSocket messages from CEO AI
+    // Accumulate streaming text outside React state to avoid stale closure
+    const streamBufferRef = { current: '' };
+
+    const handleWsMessage = (data) => {
+      const { type } = data;
+
+      if (type === 'thinking') {
+        setIsThinking(true);
+        streamBufferRef.current = '';
+        // Show thinking animation immediately
+        setCurrentSpeaker('CEO Coach');
+        setCurrentAnimation('Listen');
+      }
+
+      if (type === 'word_stream') {
+        const { character_name, word, is_complete, emotion, animation } = data;
+        setIsThinking(false);
+
+        // Accumulate text in ref (never stale)
+        streamBufferRef.current += (streamBufferRef.current ? ' ' : '') + word;
+        const fullText = streamBufferRef.current;
+
+        // Set animation based on accumulated text tone
+        const anim = animation || detectCeoAnimation(fullText);
+        setCurrentSpeaker(character_name || 'CEO Coach');
+        setCurrentAnimation(anim);
+
+        // Update transcript
+        setTranscript(prev => {
+          const existing = prev.find(m => m.id === 'stream_ceo');
+          if (existing) {
+            return prev.map(m =>
+              m.id === 'stream_ceo'
+                ? { ...m, text: fullText, complete: is_complete }
+                : m
+            );
+          }
+          return [...prev, {
+            id: 'stream_ceo',
+            sender: character_name || 'CEO Coach',
+            text: word,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            complete: is_complete
+          }];
+        });
+
+        if (is_complete) {
+          // Finalise message with final animation based on full text
+          const finalAnim = animation || detectCeoAnimation(fullText);
+          setCurrentAnimation(finalAnim);
+
+          setTranscript(prev => prev.map(m =>
+            m.id === 'stream_ceo' ? { ...m, id: `ceo_${Date.now()}`, complete: true } : m
+          ));
+
+          // Speak full text from ref (never stale)
+          speakText(fullText, () => {
+            setCurrentSpeaker(null);
+            setCurrentAnimation('Idle');
+          });
+
+          streamBufferRef.current = '';
+        }
+      }
+
+      if (type === 'character_response') {
+        // Handle non-streaming fallback responses
+        const { character_name, message, emotion, animation } = data;
+        setIsThinking(false);
+        const anim = animation || detectCeoAnimation(message);
+        setCurrentSpeaker(character_name || 'CEO Coach');
+        setCurrentAnimation(anim);
+        setTranscript(prev => [...prev, {
+          id: `ceo_${Date.now()}`,
+          sender: character_name || 'CEO Coach',
+          text: message,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          complete: true
+        }]);
+        speakText(message, () => {
+          setCurrentSpeaker(null);
+          setCurrentAnimation('Idle');
+        });
+      }
+
+      if (type === 'metrics_update') {
+        const m = data.metrics || {};
+        setBoardMetrics({
+          visionary: Math.round(m.clarity || 50),
+          strategy: Math.round(100 - (m.pressure || 50)),
+          critical: Math.round(m.confidence || 50),
+          persuasion: Math.round(m.energy || 50),
+          marketFit: Math.round(((m.clarity || 50) + (m.confidence || 50)) / 2)
+        });
+        setAccuracyScore(Math.round(m.confidence || 65));
+      }
+    };
+
+    // Keep ref updated so ws.onmessage always uses latest closure
+    handleMessageRef.current = handleWsMessage;
   };
 
   const handleContinue = () => {
@@ -749,17 +823,49 @@ const Vcs = ({ activeSim, onBack }) => {
   }, []);
 
   if (showReport) {
+    const sessionDuration = formatTime(3600 - sessionTime);
+    const aiMessages = transcript.filter(t => t.sender === "CEO Coach");
+    const userMsgs = transcript.filter(t => t.sender === "You");
+
+    const downloadReport = () => {
+      const content = `AGIOAS CEO COACHING - SESSION REPORT\n${'='.repeat(50)}\nDate: ${new Date().toLocaleDateString()}\nDuration: ${sessionDuration}\n${'='.repeat(50)}\n\nPERFORMANCE SCORE: ${accuracyScore}/100\n\nSESSION METRICS\n---------------\nAI Responses: ${aiMessages.length}\nYour Inputs: ${userMsgs.length}\nTotal Exchanges: ${transcript.length}\n\nKEY INSIGHTS\n------------\n${aiMessages.slice(0, 6).map(m => `• ${m.text}`).join('\n\n')}\n\nGenerated by AGIOAS Executive Coaching\n`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ceo_coaching_report.txt'; a.click();
+    };
+
+    const downloadTranscript = () => {
+      const lines = transcript.map(t => `[${t.time}] ${t.sender}: ${t.text}`).join('\n');
+      const content = `AGIOAS CEO COACHING - TRANSCRIPT\n${'='.repeat(50)}\nDate: ${new Date().toLocaleDateString()}\nDuration: ${sessionDuration}\n${'='.repeat(50)}\n\n${lines}\n`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ceo_coaching_transcript.txt'; a.click();
+    };
+
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="fade-in">
         <div style={{ width: 800, background: '#1A120E', border: '1px solid #D4AF68', borderRadius: 8, padding: 40, boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
-          <div style={{ textAlign: 'center', marginBottom: 40 }}><Hexagon size={48} color="#D4AF68" style={{ margin: '0 auto 16px' }} /><h2 style={{ fontSize: 32, fontFamily: 'serif', color: '#E8E0D5', margin: 0 }}>SESSION DEBRIEF</h2><p style={{ color: '#9C8C74', marginTop: 8 }}>Analysis complete. Performance recorded.</p></div>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <img src="/logo.png" alt="AGIOAS" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 16 }} />
+            <h2 style={{ fontSize: 32, fontFamily: 'serif', color: '#E8E0D5', margin: 0 }}>SESSION DEBRIEF</h2>
+            <p style={{ color: '#9C8C74', marginTop: 8 }}>Analysis complete. Performance recorded.</p>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 40 }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><BarChart size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>PERFORMANCE SCORE</span></div><div style={{ fontSize: 48, fontWeight: 700, color: '#D4AF68' }}>{accuracyScore}<span style={{ fontSize: 20, color: '#5E4F40' }}>/100</span></div><p style={{ fontSize: 13, color: '#9C8C74', marginTop: 8 }}>Strong conviction shown.</p></div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><ShieldCheck size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>KEY FEEDBACK</span></div><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ display: 'flex', gap: 8, fontSize: 13, color: '#E8E0D5' }}><ThumbsUp size={14} color="#5D7A58" /> Clear value proposition.</div><div style={{ display: 'flex', gap: 8, fontSize: 13, color: '#E8E0D5' }}><ThumbsDown size={14} color="#8A3A3A" /> Focus on scaling details.</div></div></div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><BarChart size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>PERFORMANCE SCORE</span></div>
+              <div style={{ fontSize: 48, fontWeight: 700, color: '#D4AF68' }}>{accuracyScore}<span style={{ fontSize: 20, color: '#5E4F40' }}>/100</span></div>
+              <p style={{ fontSize: 13, color: '#9C8C74', marginTop: 8 }}>Duration: {sessionDuration}</p>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><ShieldCheck size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>KEY FEEDBACK</span></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, fontSize: 13, color: '#E8E0D5' }}><ThumbsUp size={14} color="#5D7A58" /> Clear strategic thinking shown.</div>
+                <div style={{ display: 'flex', gap: 8, fontSize: 13, color: '#E8E0D5' }}><ThumbsDown size={14} color="#8A3A3A" /> Focus on execution details.</div>
+                <div style={{ fontSize: 12, color: '#9C8C74', marginTop: 4 }}>Exchanges: {transcript.length} · AI: {aiMessages.length} · You: {userMsgs.length}</div>
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 24 }}>
-            <button style={{ padding: '12px 24px', background: '#D4AF68', color: '#1A120E', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}><Download size={16} /> DOWNLOAD REPORT</button>
-            <button style={{ padding: '12px 24px', background: 'rgba(212, 175, 104, 0.1)', color: '#D4AF68', border: '1px solid #D4AF68', borderRadius: 4, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={16} /> TRANSCRIPT</button>
+            <button onClick={downloadReport} style={{ padding: '12px 24px', background: '#D4AF68', color: '#1A120E', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}><Download size={16} /> DOWNLOAD REPORT</button>
+            <button onClick={downloadTranscript} style={{ padding: '12px 24px', background: 'rgba(212, 175, 104, 0.1)', color: '#D4AF68', border: '1px solid #D4AF68', borderRadius: 4, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={16} /> TRANSCRIPT</button>
           </div>
           <div style={{ textAlign: 'center', marginTop: 24 }}><button onClick={handleExitFull} style={{ background: 'none', border: 'none', color: '#5E4F40', fontSize: 11, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.1em' }}>RESTART SESSION</button></div>
         </div>

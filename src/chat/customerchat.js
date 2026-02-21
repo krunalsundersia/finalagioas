@@ -294,8 +294,8 @@ const premiumAnimationStyles = `
   }
 
   .sentiment-neutral {
-    background: linear-gradient(135deg, rgba(74, 111, 165, 0.1), transparent);
-    border-left: 3px solid var(--info) !important;
+    background: linear-gradient(135deg, rgba(185, 149, 80, 0.06), transparent);
+    border-left: 3px solid rgba(185, 149, 80, 0.4) !important;
   }
 
   /* PREMIUM GLASS MORPHISM */
@@ -353,22 +353,35 @@ const INITIAL_MESSAGES = [
 
 // --- SENTIMENT ANALYSIS ---
 const analyzeSentiment = (text) => {
-  const positiveWords = ['love', 'great', 'excellent', 'perfect', 'amazing', 'useful', 'helpful', 'good', 'better', 'best', 'like', 'appreciate'];
-  const negativeWords = ['bad', 'terrible', 'awful', 'expensive', 'costly', 'not', 'never', 'hate', 'dislike', 'poor', 'worst', 'issue', 'problem'];
-
+  const positiveWords = ['love', 'great', 'excellent', 'perfect', 'amazing', 'useful', 'helpful', 'good', 'better', 'best', 'like', 'appreciate', 'agree', 'brilliant', 'impressive', 'absolutely', 'wonderful'];
+  const negativeWords = ['bad', 'terrible', 'awful', 'expensive', 'costly', 'not', 'never', 'hate', 'dislike', 'poor', 'worst', 'issue', 'problem', 'ridiculous', 'absurd', 'unacceptable', 'disappointing'];
   const lowerText = text.toLowerCase();
   const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
   const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-
   if (positiveCount > negativeCount) return 'positive';
   if (negativeCount > positiveCount) return 'negative';
   return 'neutral';
 };
 
+// Maps backend emotion labels → frontend sentiment display categories
+const mapEmotionToSentiment = (emotion) => {
+  const map = {
+    agreeing: 'positive',
+    positive: 'positive',
+    angry: 'negative',
+    disagreeing: 'negative',
+    negative: 'negative',
+    skeptical: 'neutral',
+    thinking: 'neutral',
+    neutral: 'neutral',
+  };
+  return map[emotion] || 'neutral';
+};
+
 // --- COMPONENTS ---
 
 // LIVE SENTIMENT BOARD (MATCHING THE IMAGE DESIGN)
-const LiveSentimentBoard = ({ feedbackData, customerPanel }) => {
+const LiveSentimentBoard = ({ feedbackData, customerPanel, performanceScore = 65 }) => {
   const getAverageSentiment = () => {
     const ratings = Object.values(feedbackData).map(f => f.rating);
     return (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
@@ -421,17 +434,21 @@ const LiveSentimentBoard = ({ feedbackData, customerPanel }) => {
         </div>
       </div>
 
-      {/* Simulation Fidelity */}
+      {/* Simulation Fidelity — live score from backend */}
       <div style={{ padding: 14, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-gold)', borderRadius: 8, marginBottom: 16 }}>
         <div style={{ fontSize: 10, color: 'var(--gold-mid)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Target size={12} /> SIMULATION FIDELITY
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Agent Performance Sync</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--gold-mid)' }}>65%</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: performanceScore >= 70 ? 'var(--success)' : performanceScore >= 50 ? 'var(--gold-mid)' : 'var(--danger)' }}>{performanceScore}%</div>
         </div>
         <div style={{ height: 6, background: 'rgba(0,0,0,0.3)', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ width: '65%', height: '100%', background: 'var(--gold-grad)' }} />
+          <div style={{ width: `${performanceScore}%`, height: '100%', background: 'var(--gold-grad)', transition: 'width 0.5s ease' }} />
+        </div>
+        <div style={{ marginTop: 8, fontSize: 9, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+          <span>VALUE · EFFORT · RISK</span>
+          <span>TRUST · COMPARISON · EMOTION</span>
         </div>
       </div>
 
@@ -567,26 +584,39 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
   const handleWebSocketMessage = useCallback((data) => {
     console.log('📨 WebSocket message:', data.type, data);
 
-    // Handle word-by-word streaming
+    // ── THINKING: show dots the moment backend starts processing ─────────────
+    // Triggered immediately when user sends — before any words arrive
+    if (data.type === 'thinking') {
+      const member = customerPanel.find(m => m.name === (data.character_name || data.speaker));
+      setTypingMemberId(member?.id || data.character_name || data.speaker || 'thinking');
+      return;
+    }
+
+    // ── WORD STREAM ───────────────────────────────────────────────────────────
+    // FIX: Kill thinking dots on FIRST word — zero overlap with streaming bubble
     if (data.type === 'word_stream') {
-      const { character_name, word, is_complete, sentiment } = data;
+      const { character_name, word, is_complete, sentiment: rawSentiment, emotion } = data;
+      const sentiment = emotion ? mapEmotionToSentiment(emotion) : (rawSentiment || 'neutral');
+
+      // Clear thinking dots immediately when first word arrives
+      setTypingMemberId(null);
 
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
-        if (lastMsg && lastMsg.sender === character_name && lastMsg.type === 'agent') {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1] = {
+        // Append to existing streaming bubble for this speaker
+        if (lastMsg && lastMsg.sender === character_name && lastMsg.type === 'agent' && lastMsg.isStreaming) {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
             ...lastMsg,
-            text: lastMsg.text + " " + word,
-            sentiment: sentiment || lastMsg.sentiment
+            text: lastMsg.text + ' ' + word,
+            sentiment: sentiment || lastMsg.sentiment,
+            isStreaming: !is_complete,
           };
-          return newMessages;
+          return updated;
         }
-
+        // First word — create the streaming bubble (replaces thinking dots visually)
         const member = customerPanel.find(m => m.name === character_name);
-        // Generate initials from character_name if member not found
         const initials = member?.initials || character_name.split(' ').map(n => n[0]).join('').toUpperCase();
-
         return [...prev, {
           id: Date.now(),
           sender: character_name,
@@ -594,63 +624,67 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
           text: word,
           type: 'agent',
           sentiment: sentiment || 'neutral',
-          initials: initials
+          initials,
+          isStreaming: !is_complete,
         }];
       });
-
-      if (is_complete) {
-        setTypingMemberId(null);
-      } else {
-        const member = customerPanel.find(m => m.name === character_name);
-        setTypingMemberId(member?.id);
-      }
       return;
     }
 
-    // Handle complete response
+    // ── COMPLETE RESPONSE (non-streaming) ─────────────────────────────────────
+    // Thinking dots show → then full message snaps in cleanly, no flicker
     if (data.type === 'character_response' || (data.type === 'agent' && data.message)) {
       setTypingMemberId(null);
 
       const characterName = data.character_name || data.speaker || 'Customer';
       const responseText = data.response || data.message;
-      const sentiment = data.sentiment || analyzeSentiment(responseText);
+      const rawEmotion = data.emotion || data.sentiment || '';
+      const sentiment = rawEmotion ? mapEmotionToSentiment(rawEmotion) : analyzeSentiment(responseText);
+
+      if (data.performance_score) setPerformanceScore(data.performance_score);
+
+      if (data.trust_score !== undefined || data.engagement_level !== undefined) {
+        setCustomerPanel(prev => prev.map(c =>
+          c.name === characterName
+            ? { ...c, trustScore: data.trust_score, engagementLevel: data.engagement_level }
+            : c
+        ));
+      }
 
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
-        if (lastMsg && lastMsg.sender === characterName) {
-          return prev;
+        // If a streaming bubble exists for this sender, finalize it with full text
+        if (lastMsg && lastMsg.sender === characterName && lastMsg.type === 'agent') {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...lastMsg, text: responseText, sentiment, isStreaming: false };
+          return updated;
         }
-
+        // No streaming bubble — add fresh complete message
         const member = customerPanel.find(m => m.name === characterName);
-        // Generate initials from characterName if member not found
         const initials = member?.initials || characterName.split(' ').map(n => n[0]).join('').toUpperCase();
-
         return [...prev, {
           id: Date.now(),
           sender: characterName,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: responseText,
           type: 'agent',
-          sentiment: sentiment,
-          initials: initials
+          sentiment,
+          initials,
+          isStreaming: false,
         }];
       });
 
-      // Update feedback data based on response
       const member = customerPanel.find(m => m.name === characterName);
       if (member) {
         const ratingChange = sentiment === 'positive' ? 1 : sentiment === 'negative' ? -1 : 0;
-
         setFeedbackData(prev => ({
           ...prev,
           [member.id]: {
             rating: Math.min(5, Math.max(1, (prev[member.id]?.rating || 3) + ratingChange)),
             comment: responseText,
-            sentiment: sentiment
+            sentiment,
           }
         }));
-
-        // Update customer panel sentiment
         setCustomerPanel(prev => prev.map(c =>
           c.id === member.id ? { ...c, sentiment } : c
         ));
@@ -658,25 +692,16 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
       return;
     }
 
-    // Handle thinking
-    if (data.type === 'thinking') {
-      const member = customerPanel.find(m => m.name === (data.character_name || data.speaker));
-      setTypingMemberId(member?.id);
-      return;
-    }
-
-    // Handle meeting ended
+    // ── MEETING ENDED ─────────────────────────────────────────────────────────
     if (data.type === 'meeting_ended') {
       setEndReason(data.reason || 'Meeting ended');
       setIsMeetingEnded(true);
       return;
     }
 
-    // Handle analytics update
+    // ── ANALYTICS UPDATE ──────────────────────────────────────────────────────
     if (data.type === 'analytics_update') {
-      if (data.performance_score) {
-        setPerformanceScore(data.performance_score);
-      }
+      if (data.performance_score) setPerformanceScore(data.performance_score);
     }
   }, [customerPanel]);
 
@@ -708,18 +733,28 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
           console.log('✅ WebSocket connected');
           setIsConnected(true);
 
-          // Send company context first
+          // ✅ Send full frontpage config as company context
+          // config is the meetingConfig object passed from CustomerFrontpage.js
+          const ctxSource = config?.context || config || {};
           ws.send(JSON.stringify({
             type: 'company_context',
             context: {
-              company_name: config.companyName || 'Your Company',
-              product: config.productName || 'Product',
-              industry: config.industry || 'Technology',
-              stage: config.stage || 'Growth',
-              scenario: config.scenario || 'Customer feedback session'
+              title: ctxSource.title || 'Customer Interaction Pod',
+              productName: ctxSource.productName || ctxSource.title || 'Product',
+              productPitch: ctxSource.productPitch || ctxSource.pitchText || '',
+              valueProp: ctxSource.valueProp || '',
+              visualDescription: ctxSource.visualDescription || ctxSource.productDesc || '',
+              targetJourney: ctxSource.targetJourney || 'Discovery',
+              targetArea: ctxSource.targetArea || 'Global',
+              targetPocket: ctxSource.targetPocket || 'Mid-Market',
+              preReviewContext: ctxSource.preReviewContext || '',
+              knownLimitations: ctxSource.knownLimitations || '',
+              competitorContext: ctxSource.competitorContext || '',
+              successMetrics: ctxSource.successMetrics || '',
+              stakeholders: ctxSource.stakeholders || [],
             }
           }));
-          console.log('📊 Company context sent');
+          console.log('📊 Company context sent:', ctxSource.productPitch || ctxSource.title);
 
           setTimeout(() => {
             setMessages(prev => [...prev, {
@@ -830,6 +865,11 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
     setMessages(prev => [...prev, newMsg]);
     setInputText("");
 
+    // ✅ Show thinking dots IMMEDIATELY — no waiting for server 'thinking' event
+    // Dots disappear the instant the first word arrives (in word_stream handler)
+    const thinkingMember = customerPanel[Math.floor(Math.random() * customerPanel.length)];
+    setTypingMemberId(thinkingMember?.id || 'thinking');
+
     // Send via WebSocket if connected
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log('📤 Sending message to backend:', inputText);
@@ -839,6 +879,7 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
       }));
     } else {
       console.warn('⚠️ WebSocket not connected, using fallback');
+      setTypingMemberId(null);
       simulateResponse();
     }
   };
@@ -855,6 +896,7 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
 
   const simulateResponse = () => {
     const member = customerPanel[Math.floor(Math.random() * customerPanel.length)];
+    // Thinking dots already set by handleSendMessage — update to correct member
     setTypingMemberId(member.id);
 
     const responses = {
@@ -1238,7 +1280,7 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
           </div>
 
           {/* LIVE SENTIMENT BOARD - MATCHING IMAGE EXACTLY */}
-          <LiveSentimentBoard feedbackData={feedbackData} customerPanel={customerPanel} />
+          <LiveSentimentBoard feedbackData={feedbackData} customerPanel={customerPanel} performanceScore={performanceScore} />
 
           <button
             onClick={() => setIsBreakModalOpen(true)}
@@ -1321,16 +1363,68 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
                     <div style={{ maxWidth: '70%', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: isRightSide ? 'flex-end' : 'flex-start' }}>
                         {!isRightSide && (
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--border-gold)', border: '2px solid var(--gold-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: 'var(--gold-mid)' }}>
-                            {msg.initials}
+                          <div style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            background: `hsl(${(msg.sender?.charCodeAt(0) || 65) * 13 % 360}, 45%, 30%)`,
+                            border: '2px solid rgba(196, 168, 111, 0.5)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: '#E8E0D5',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                          }}>
+                            {msg.initials || (msg.sender?.split(' ').map(n => n[0]).join('').toUpperCase())}
                           </div>
+                        )}
+                        {isRightSide && (
+                          <img
+                            src="/logo.png"
+                            alt="You"
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: '50%',
+                              border: '2px solid var(--gold-mid)',
+                              objectFit: 'contain',
+                              background: 'rgba(0,0,0,0.3)',
+                              flexShrink: 0
+                            }}
+                            onError={e => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                            }}
+                          />
                         )}
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{msg.sender}</span>
                       </div>
 
                       <div className={msg.type === 'agent' ? getSentimentClass(msg.sentiment) : ''} style={{ padding: 16, background: bubbleBg, backdropFilter: 'blur(8px)', border: `1px solid ${bubbleBorder}`, borderRadius: 12, fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.6 }}>
                         {msg.type === 'agent' ? (
-                          <TypewriterText text={msg.text} sentiment={msg.sentiment} />
+                          msg.isStreaming ? (
+                            // ✅ FIX: While streaming, render plain text + blinking cursor
+                            // No TypewriterText re-animation — words just appear cleanly
+                            <span>
+                              {msg.text}
+                              <span style={{
+                                display: 'inline-block',
+                                width: 2,
+                                height: '1em',
+                                background: 'var(--gold-mid)',
+                                marginLeft: 2,
+                                verticalAlign: 'text-bottom',
+                                animation: 'neuralPulse 0.8s infinite',
+                                borderRadius: 1,
+                              }} />
+                            </span>
+                          ) : (
+                            // Fully received — show with typewriter pop-in animation
+                            <TypewriterText text={msg.text} sentiment={msg.sentiment} />
+                          )
                         ) : (
                           msg.text
                         )}
@@ -1345,63 +1439,68 @@ const CustomerFeedbackRoom = ({ config, onBack }) => {
               );
             })}
 
-            {typingMemberId && (
-              <div style={{
-                display: 'flex',
-                gap: 12,
-                padding: '12px 16px',
-                animation: 'msgPopIn 0.3s ease-out',
-                background: 'rgba(185, 149, 80, 0.05)', // ✅ Slight highlight
-                borderRadius: 8,
-                border: `1px solid rgba(185, 149, 80, 0.15)` // ✅ Border for visibility
-              }}>
+            {typingMemberId && (() => {
+              const _typingMember = customerPanel.find(m => m.id === typingMemberId);
+              const _typingName = _typingMember?.name || (typeof typingMemberId === 'string' ? typingMemberId : 'Customer');
+              const _typingInitials = _typingMember?.initials || _typingName.split(' ').map(n => n[0]).join('').toUpperCase();
+              return (
                 <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: colors.goldGrad,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: colors.textDark,
-                  boxShadow: '0 0 20px rgba(185, 149, 80, 0.4)' // ✅ Glow effect
-                }}>
-                  {boardMembers.find(m => m.id === typingMemberId)?.initials}
-                </div>
-                <div style={{
-                  flex: 1,
-                  background: colors.bgCard,
-                  borderRadius: 8,
+                  gap: 12,
                   padding: '12px 16px',
-                  border: `1px solid ${colors.border}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
+                  animation: 'msgPopIn 0.3s ease-out',
+                  background: 'rgba(185, 149, 80, 0.05)',
+                  borderRadius: 8,
+                  border: `1px solid rgba(185, 149, 80, 0.15)`
                 }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[0, 1, 2].map(i => (
-                      <div key={i} style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: colors.gold,
-                        animation: `dotPulse 1.4s infinite ease-in-out ${i * 0.2}s`,
-                        boxShadow: '0 0 10px rgba(185, 149, 80, 0.6)' // ✅ Dot glow
-                      }} />
-                    ))}
-                  </div>
-                  <span style={{
-                    color: colors.textDim,
-                    fontSize: 13,
-                    fontStyle: 'italic'
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: colors.goldGrad,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: colors.textDark,
+                    boxShadow: '0 0 20px rgba(185, 149, 80, 0.4)' // ✅ Glow effect
                   }}>
-                    {boardMembers.find(m => m.id === typingMemberId)?.name} is thinking...
-                  </span>
+                    {_typingInitials}
+                  </div>
+                  <div style={{
+                    flex: 1,
+                    background: colors.bgCard,
+                    borderRadius: 8,
+                    padding: '12px 16px',
+                    border: `1px solid ${colors.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: colors.gold,
+                          animation: `neuralPulse 1.4s infinite ease-in-out ${i * 0.2}s`,
+                          boxShadow: '0 0 10px rgba(185, 149, 80, 0.6)'
+                        }} />
+                      ))}
+                    </div>
+                    <span style={{
+                      color: colors.textDim,
+                      fontSize: 13,
+                      fontStyle: 'italic'
+                    }}>
+                      {_typingName} is applying thinking framework...
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div ref={chatEndRef} />
           </div>

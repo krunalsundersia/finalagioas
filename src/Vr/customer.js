@@ -459,10 +459,18 @@ const SatisfactionBoard = ({ onClose, customers, performanceScore }) => {
             <Target size={14} color="#D4AF68" /><span style={{ color: '#D4AF68', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>SIMULATION FIDELITY</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ color: '#E8E0D5', fontSize: 10 }}>Agent Performance Sync</span><span style={{ color: getColor(performanceScore), fontSize: 14, fontWeight: 700 }}>{performanceScore}%</span>
+            <span style={{ color: '#E8E0D5', fontSize: 10 }}>Agent Performance Sync</span>
+            <span style={{ color: getColor(performanceScore), fontSize: 14, fontWeight: 700 }}>{performanceScore}%</span>
           </div>
-          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2 }}>
-            <div style={{ width: `${performanceScore}%`, height: '100%', background: getColor(performanceScore), borderRadius: 2 }} />
+          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginBottom: 12 }}>
+            <div style={{ width: `${performanceScore}%`, height: '100%', background: getColor(performanceScore), borderRadius: 2, transition: 'width 0.5s ease' }} />
+          </div>
+          {/* 6 Thinking Skills Legend */}
+          <div style={{ fontSize: 8, color: '#5E4F40', letterSpacing: '0.05em', lineHeight: 1.8 }}>
+            <div style={{ color: '#9C8C74', fontSize: 9, fontWeight: 700, marginBottom: 4 }}>ACTIVE THINKING SKILLS</div>
+            <div>① VALUE PERCEPTION  ② EFFORT AWARENESS</div>
+            <div>③ RISK SENSITIVITY  ④ TRUST EVALUATION</div>
+            <div>⑤ COMPARISON LOGIC  ⑥ EMOTIONAL RESPONSE</div>
           </div>
         </div>
 
@@ -532,6 +540,58 @@ const TypewriterText = ({ text, onComplete }) => {
   );
 };
 
+// Helper to get auth token
+const getAuthToken = () => {
+  try {
+    return (
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('agioas_token') ||
+      localStorage.getItem('auth_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken') ||
+      sessionStorage.getItem('access_token') ||
+      sessionStorage.getItem('agioas_token') ||
+      sessionStorage.getItem('token') ||
+      ''
+    );
+  } catch { return ''; }
+};
+
+// Build auth headers with token + session cookie fallback
+const buildAuthHeaders = (extra = {}) => {
+  const token = getAuthToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...extra
+  };
+};
+
+// Map backend emotion string to animation/display state
+const mapEmotionToAnimation = (emotion, customerId) => {
+  const ANIM_MAP = {
+    angry: ['Angry', 'No', 'Damit'],
+    disagreeing: ['No', 'Angry'],
+    agreeing: ['Clap', 'Talk'],
+    positive: ['Clap', 'Talk'],
+    thinking: ['Think', 'Listen'],
+    skeptical: ['Think', 'Listen'],
+    neutral: ['Talk', 'Idle'],
+    negative: ['No', 'Angry'],
+  };
+  const AVAILABLE = {
+    Cus1: ['Idle', 'Talk', 'Think', 'Clap', 'No'],
+    Cus2: ['Idle', 'Talk', 'Clap', 'Listen', 'No'],
+    Cus3: ['Idle', 'Talk', 'Angry', 'Clap', 'No'],
+    Cus4: ['Idle', 'Talk', 'Clap', 'Listen', 'No'],
+    Cus5: ['Idle', 'Talk', 'Clap', 'No', 'Oh'],
+    Cus6: ['Idle', 'Talk', 'Angry', 'Clap', 'Damit'],
+  };
+  const preferred = ANIM_MAP[emotion] || ['Talk'];
+  const available = AVAILABLE[customerId] || ['Talk', 'Idle'];
+  return preferred.find(a => available.includes(a)) || 'Talk';
+};
+
 // --- 8. MAIN APP COMPONENT WITH FIXED STATE MANAGEMENT ---
 const CustomerService = ({ onBack }) => {
   const [config] = useState({ title: "AGIOAS", focusMode: true });
@@ -546,6 +606,8 @@ const CustomerService = ({ onBack }) => {
   const [isModelsMuted, setIsModelsMuted] = useState(false);
   const [userMessage, setUserMessage] = useState("");
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
+  // ✅ NEW: End session confirmation state
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   // FIX: Add missing state variables for animations
   const [characterAnimations, setCharacterAnimations] = useState({
@@ -607,6 +669,13 @@ const CustomerService = ({ onBack }) => {
           const authenticatedSessionId = response.data.session.session_id;
           setSessionId(authenticatedSessionId);
           console.log('✅ Authenticated session started:', authenticatedSessionId);
+
+          // ✅ Cache token from response for subsequent fetch() calls
+          const responseToken = response.data.token || response.data.access_token || response.data.access || null;
+          if (responseToken) {
+            localStorage.setItem('access_token', responseToken);
+            console.log('✅ Auth token cached');
+          }
 
           // [KEEP ALL YOUR ORIGINAL 3D SCENE INITIALIZATION CODE BELOW HERE]
 
@@ -684,7 +753,17 @@ const CustomerService = ({ onBack }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleEndSession = () => { setIsMeetingStarted(false); setShowReport(true); };
+  const handleEndSession = () => {
+    // ✅ FIX: Show confirmation modal first
+    setShowEndConfirm(true);
+  };
+
+  const confirmEndSession = () => {
+    setShowEndConfirm(false);
+    setIsMeetingStarted(false);
+    setShowReport(true);
+    if (speechSynthRef.current) speechSynthRef.current.cancel();
+  };
 
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !sessionId) return;
@@ -695,33 +774,52 @@ const CustomerService = ({ onBack }) => {
     setIsThinking(true);
 
     try {
+      // ✅ Auth: tries all token keys, falls back to session cookie
       const response = await fetch(`${BACKEND_API_URL}/sessions/${sessionId}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ message: messageToSend })
       });
+
+      // Handle 401 gracefully
+      if (response.status === 401) {
+        console.error('❌ 401 Unauthorized');
+        setIsThinking(false);
+        alert('Session expired. Please log in again.');
+        window.location.href = '/login';
+        return;
+      }
+
       const data = await response.json();
-
-      // Handle responses array
       const responses = data.responses || [];
-
       setIsThinking(false);
 
-      // Process each response (may have multiple customers responding)
       for (const responseData of responses) {
         const responseText = responseData.message || responseData.response;
-        const speaker = responseData.speaker || ALL_CUSTOMERS[Math.floor(Math.random() * ALL_CUSTOMERS.length)];
-        const animation = responseData.animation || "Talk";
+
+        // ✅ Use customer_id (e.g. "Cus1") as speaker key for animation
+        const speaker = responseData.customer_id || responseData.speaker || ALL_CUSTOMERS[Math.floor(Math.random() * ALL_CUSTOMERS.length)];
+
+        // ✅ Use backend emotion to pick correct animation if not provided
         const emotion = responseData.emotion || "neutral";
+        const animation = responseData.animation || mapEmotionToAnimation(emotion, speaker);
 
         setCurrentSpeaker(speaker);
         setCurrentEmotion(emotion);
-
-        // FIX: Set animation for specific speaker
         setCharacterAnimations(prev => ({ ...prev, [speaker]: animation }));
         setIsSpeaking(true);
 
+        // Update performance score from backend
         if (responseData.performance_score) setPerformanceScore(responseData.performance_score);
+
+        // Update customer satisfaction in panel from backend state
+        if (data.customer_states) {
+          setCustomerConfig(prev => prev.map(c => {
+            const backendState = data.customer_states[c.name];
+            return backendState ? { ...c, satisfaction: backendState.satisfaction } : c;
+          }));
+        }
 
         setTranscript(prev => [...prev, { sender: speaker, text: responseText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
 
@@ -791,22 +889,181 @@ const CustomerService = ({ onBack }) => {
     if (onBack) onBack();
   }
 
-  if (showReport) {
+  if (showEndConfirm) {
     return (
-      <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 800, background: '#1A120E', border: '1px solid #D4AF68', borderRadius: 8, padding: 40 }}>
-          <div style={{ textAlign: 'center', marginBottom: 40 }}><img src="/logo.png" alt="Logo" style={{ width: 60, height: 60, marginBottom: 16 }} /><h2 style={{ fontSize: 32, fontFamily: 'serif', color: '#E8E0D5', margin: 0 }}>INTELLIGENCE REPORT</h2></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 40 }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><BarChart size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>SUCCESS RATE</span></div>
-              <div style={{ fontSize: 48, fontWeight: 700, color: '#D4AF68' }}>{performanceScore}%</div>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: '#1A120E', border: '1px solid rgba(212, 175, 104, 0.4)', borderRadius: 12, padding: 48, maxWidth: 440, textAlign: 'center', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
+          <PhoneOff size={48} color="#8A3A3A" style={{ margin: '0 auto 24px', display: 'block' }} />
+          <h2 style={{ fontSize: 24, color: '#E8E0D5', fontFamily: 'serif', margin: '0 0 12px' }}>End Session?</h2>
+          <p style={{ fontSize: 14, color: '#9C8C74', margin: '0 0 36px', lineHeight: 1.6 }}>
+            Are you sure you want to end this simulation? A full report and transcript will be generated.
+          </p>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => setShowEndConfirm(false)}
+              style={{ flex: 1, padding: '14px 0', background: 'transparent', border: '1px solid rgba(196, 168, 111, 0.3)', borderRadius: 6, color: '#E8E0D5', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmEndSession}
+              style={{ flex: 1, padding: '14px 0', background: '#8A3A3A', border: 'none', borderRadius: 6, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}
+            >
+              End Session
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showReport) {
+    const sessionDuration = 1800 - sessionTime;
+    const avgSatisfaction = Math.round(customerConfig.reduce((sum, c) => sum + c.satisfaction, 0) / customerConfig.length);
+    const userTurns = transcript.filter(t => t.sender === 'You (Agent)').length;
+    const aiTurns = transcript.filter(t => !t.sender.includes('You') && t.sender !== 'System').length;
+    const sessionDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Professional download handler
+    const handleDownload = (type) => {
+      let content = '';
+      const title = type === 'report' ? 'INTELLIGENCE REPORT' : 'SESSION TRANSCRIPT';
+
+      if (type === 'transcript') {
+        content = `AGIOAS CUSTOMER SIMULATION\n${title}\n${'='.repeat(50)}\nDate: ${sessionDate}\nSession Duration: ${Math.floor(sessionDuration / 60)}m ${sessionDuration % 60}s\nPerformance Score: ${performanceScore}%\n\n${'='.repeat(50)}\nCONVERSATION LOG\n${'='.repeat(50)}\n\n`;
+        transcript.forEach(msg => {
+          content += `[${msg.time}] ${msg.sender}:\n${msg.text}\n\n`;
+        });
+      } else {
+        content = `AGIOAS CUSTOMER SIMULATION\n${title}\n${'='.repeat(50)}\nDate: ${sessionDate}\nSession Duration: ${Math.floor(sessionDuration / 60)}m ${sessionDuration % 60}s\n\n${'='.repeat(50)}\nEXECUTIVE SUMMARY\n${'='.repeat(50)}\n\nPerformance Score: ${performanceScore}%\nAverage Customer Satisfaction: ${avgSatisfaction}%\nAgent Turns: ${userTurns}\nCustomer Interactions: ${aiTurns}\n\n${'='.repeat(50)}\nCUSTOMER PANEL ANALYSIS\n${'='.repeat(50)}\n\n`;
+        customerConfig.forEach(c => {
+          const status = c.satisfaction >= 70 ? 'RESOLVED' : c.satisfaction >= 50 ? 'PARTIAL' : 'UNRESOLVED';
+          content += `${c.name} — Issue: ${c.issue}\nSatisfaction: ${c.satisfaction}% | Status: ${status}\n\n`;
+        });
+        content += `${'='.repeat(50)}\nKEY INSIGHTS\n${'='.repeat(50)}\n\n`;
+        content += performanceScore >= 70
+          ? '✓ Strong resolution performance. Maintain proactive approach.\n✓ Positive engagement with customer concerns.\n✓ Effective escalation management observed.\n'
+          : '→ Focus on first-contact resolution improvement.\n→ Empathy expressions should precede solutions.\n→ Consider proactive follow-up protocols.\n';
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agioas_${type}_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', zIndex: 100, overflowY: 'auto', padding: '40px 0' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 40px' }}>
+
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 24 }}>
+              <div style={{ width: 64, height: 3, background: 'linear-gradient(90deg, transparent, #D4AF68)' }} />
+              <img src="/logo.png" alt="AGIOAS" style={{ width: 56, height: 56, objectFit: 'contain' }} onError={e => e.target.style.display = 'none'} />
+              <div style={{ width: 64, height: 3, background: 'linear-gradient(90deg, #D4AF68, transparent)' }} />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><ShieldCheck size={20} color="#D4AF68" /><span style={{ fontSize: 14, fontWeight: 700, color: '#E8E0D5' }}>FEEDBACK</span></div>
-              <div style={{ color: '#E8E0D5', fontSize: 13 }}>Optimized engagement strategy detected.</div>
+            <div style={{ fontSize: 11, color: '#D4AF68', letterSpacing: '0.25em', marginBottom: 8 }}>AGIOAS INTELLIGENCE PLATFORM</div>
+            <h1 style={{ fontSize: 36, fontFamily: 'serif', color: '#E8E0D5', margin: 0, letterSpacing: '0.05em' }}>SESSION COMPLETE</h1>
+            <div style={{ fontSize: 13, color: '#9C8C74', marginTop: 8 }}>{sessionDate} · Duration: {Math.floor(sessionDuration / 60)}m {sessionDuration % 60}s</div>
+          </div>
+
+          {/* Score Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+            {[
+              { label: 'Performance Score', value: `${performanceScore}%`, icon: BarChart, color: performanceScore >= 70 ? '#5D7A58' : '#D4AF68' },
+              { label: 'Avg Satisfaction', value: `${avgSatisfaction}%`, icon: ThumbsUp, color: avgSatisfaction >= 60 ? '#5D7A58' : '#8A3A3A' },
+              { label: 'Interactions', value: userTurns + aiTurns, icon: Activity, color: '#D4AF68' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(196, 168, 111, 0.15)', borderRadius: 8, padding: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <Icon size={18} color="#D4AF68" />
+                  <span style={{ fontSize: 11, color: '#9C8C74', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
+                </div>
+                <div style={{ fontSize: 42, fontWeight: 800, color }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Customer Panel Results */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(196, 168, 111, 0.15)', borderRadius: 8, padding: 28, marginBottom: 24 }}>
+            <div style={{ fontSize: 11, color: '#D4AF68', letterSpacing: '0.15em', marginBottom: 20, textTransform: 'uppercase', fontWeight: 700 }}>Customer Panel Results</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {customerConfig.map(c => {
+                const status = c.satisfaction >= 70 ? { label: 'RESOLVED', color: '#5D7A58' } : c.satisfaction >= 50 ? { label: 'PARTIAL', color: '#D4AF68' } : { label: 'UNRESOLVED', color: '#8A3A3A' };
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: 6 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: `hsl(${c.id * 55}, 35%, 28%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#E8E0D5', flexShrink: 0 }}>
+                      {c.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#E8E0D5', fontWeight: 600 }}>{c.name}</div>
+                      <div style={{ fontSize: 11, color: '#9C8C74' }}>{c.issue}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 100, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ width: `${c.satisfaction}%`, height: '100%', background: status.color, borderRadius: 2 }} />
+                      </div>
+                      <span style={{ fontSize: 12, color: status.color, fontWeight: 700, minWidth: 72, textAlign: 'right' }}>{status.label}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}><button onClick={handleExitFull} style={{ background: 'none', border: 'none', color: '#D4AF68', cursor: 'pointer' }}>RESTART SIMULATION</button></div>
+
+          {/* Session Transcript Preview */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(196, 168, 111, 0.15)', borderRadius: 8, padding: 28, marginBottom: 24 }}>
+            <div style={{ fontSize: 11, color: '#D4AF68', letterSpacing: '0.15em', marginBottom: 20, textTransform: 'uppercase', fontWeight: 700 }}>Session Transcript</div>
+            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {transcript.slice(-10).map((msg, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: 10, color: '#5E4F40', minWidth: 44, paddingTop: 2, fontFamily: 'monospace' }}>{msg.time}</div>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: msg.sender.includes('You') ? '#D4AF68' : '#E8E0D5' }}>{msg.sender}: </span>
+                    <span style={{ fontSize: 13, color: '#9C8C74', lineHeight: 1.5 }}>{msg.text}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Download Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
+            <button
+              onClick={() => handleDownload('report')}
+              style={{ padding: '16px', background: 'rgba(212, 175, 104, 0.1)', border: '1px solid rgba(212, 175, 104, 0.3)', borderRadius: 8, color: '#D4AF68', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+            >
+              <FileText size={16} /> Download Full Report
+            </button>
+            <button
+              onClick={() => handleDownload('transcript')}
+              style={{ padding: '16px', background: 'rgba(93, 122, 88, 0.1)', border: '1px solid rgba(93, 122, 88, 0.3)', borderRadius: 8, color: '#5D7A58', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+            >
+              <FileText size={16} /> Download Transcript
+            </button>
+          </div>
+
+          {/* Footer Actions */}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button
+              onClick={handleExitFull}
+              style={{ padding: '14px 40px', background: 'linear-gradient(135deg, #9C7840 0%, #E8CD8C 50%, #9C7840 100%)', border: 'none', borderRadius: 6, color: '#1A120E', fontWeight: 800, fontSize: 14, cursor: 'pointer', letterSpacing: '0.05em' }}
+            >
+              NEW SESSION
+            </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                style={{ padding: '14px 40px', background: 'transparent', border: '1px solid rgba(196, 168, 111, 0.3)', borderRadius: 6, color: '#9C8C74', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Back to Setup
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -839,12 +1096,28 @@ const CustomerService = ({ onBack }) => {
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {transcript.map((msg, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ color: msg.sender.includes("You") ? '#D4AF68' : '#E8E0D5', fontSize: 11, fontWeight: 700 }}>{msg.sender}</span>
+                <span style={{ color: msg.sender.includes("You") ? '#D4AF68' : msg.sender === 'System' ? '#5E4F40' : '#E8E0D5', fontSize: 11, fontWeight: 700 }}>{msg.sender}</span>
                 <div style={{ color: '#9C8C74', fontSize: 13, lineHeight: 1.4 }}>
                   {idx === transcript.length - 1 && msg.sender !== "You (Agent)" && msg.sender !== "System" ? <TypewriterText text={msg.text} /> : msg.text}
                 </div>
               </div>
             ))}
+            {/* ✅ FIX: Show thinking animation in transcript */}
+            {isThinking && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ color: '#9C8C74', fontSize: 11, fontWeight: 700 }}>Customer</span>
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '8px 0' }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: '#D4AF68',
+                      animation: `pulse 1.4s infinite ease-in-out ${i * 0.2}s`
+                    }} />
+                  ))}
+                  <span style={{ color: '#5E4F40', fontSize: 12, fontStyle: 'italic', marginLeft: 6 }}>applying thinking framework...</span>
+                </div>
+              </div>
+            )}
             <div ref={transcriptEndRef} />
           </div>
         </div>
@@ -853,10 +1126,20 @@ const CustomerService = ({ onBack }) => {
       {showSatisfactionBoard && <SatisfactionBoard onClose={() => setShowSatisfactionBoard(false)} customers={customerConfig} performanceScore={performanceScore} />}
 
       <div style={{ flex: 1, position: 'relative' }}>
-        <Canvas camera={{ position: [0, 2, 10], fov: 45 }}>
+        <Canvas
+          camera={{ position: [0, 2, 10], fov: 45, near: 0.1, far: 100 }}
+          dpr={[1, Math.min(window.devicePixelRatio, 2)]}
+          gl={{
+            antialias: true,
+            alpha: false,
+            powerPreference: 'high-performance',
+          }}
+          style={{ display: 'block' }}
+        >
           <Suspense fallback={null}>
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[5, 10, 5]} intensity={1.5} castShadow />
+            <ambientLight intensity={0.8} />
+            <directionalLight position={[5, 10, 5]} intensity={1.8} castShadow shadow-mapSize={[2048, 2048]} />
+            <directionalLight position={[-5, 5, -5]} intensity={0.4} />
             <Environment preset="city" />
             <Background />
             <Customer1Controller animation={characterAnimations.Cus1} />
@@ -865,23 +1148,23 @@ const CustomerService = ({ onBack }) => {
             <Customer4Controller animation={characterAnimations.Cus4} />
             <Customer5Controller animation={characterAnimations.Cus5} />
             <Customer6Controller animation={characterAnimations.Cus6} />
-            <OrbitControls target={[0, 0, 0]} enableDamping={true} />
+            <OrbitControls target={[0, 0, 0]} enableDamping dampingFactor={0.05} />
           </Suspense>
         </Canvas>
       </div>
 
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 40px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', zIndex: 100, pointerEvents: 'none' }}>
         <div style={{ display: 'flex', gap: 12, pointerEvents: 'auto' }}>
-          <button onClick={() => setShowSatisfactionBoard(!showSatisfactionBoard)} style={{ width: 44, height: 44, borderRadius: '50%', background: showSatisfactionBoard ? '#D4AF68' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: showSatisfactionBoard ? '#1A120E' : '#E8E0D5', cursor: 'pointer' }}><Info size={20} /></button>
-          <button onClick={() => setShowTranscript(!showTranscript)} style={{ height: 44, padding: '0 20px', borderRadius: 22, background: showTranscript ? '#D4AF68' : 'rgba(255,255,255,0.05)', color: showTranscript ? '#1A120E' : '#E8E0D5', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}><FileText size={16} /> DATA FEED</button>
-          <button onClick={() => setIsModelsMuted(!isModelsMuted)} style={{ height: 44, padding: '0 20px', borderRadius: 22, background: isModelsMuted ? '#8A3A3A' : 'rgba(255,255,255,0.05)', color: '#E8E0D5', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>{isModelsMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
+          <button onClick={() => setShowSatisfactionBoard(!showSatisfactionBoard)} style={{ width: 44, height: 44, borderRadius: '50%', background: showSatisfactionBoard ? '#D4AF68' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: showSatisfactionBoard ? '#1A120E' : '#E8E0D5', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Info size={20} /></button>
+          <button onClick={() => setShowTranscript(!showTranscript)} style={{ height: 44, padding: '0 20px', borderRadius: 22, background: showTranscript ? '#D4AF68' : 'rgba(255,255,255,0.05)', color: showTranscript ? '#1A120E' : '#E8E0D5', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.1)' }}><FileText size={16} /> DATA FEED</button>
+          <button onClick={() => setIsModelsMuted(!isModelsMuted)} style={{ height: 44, padding: '0 20px', borderRadius: 22, background: isModelsMuted ? '#8A3A3A' : 'rgba(255,255,255,0.05)', color: '#E8E0D5', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.1)' }}>{isModelsMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
         </div>
         <div style={{ flex: 1, margin: '0 20px', pointerEvents: 'auto', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', border: '1px solid #D4AF68', borderRadius: 24, display: 'flex', alignItems: 'flex-end', padding: '8px 16px', maxWidth: 800 }}>
           <textarea ref={inputRef} value={userMessage} onChange={(e) => setUserMessage(e.target.value)} placeholder="Type simulation response..." disabled={currentSpeaker !== null || isThinking} style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#E8E0D5', fontSize: 14, resize: 'none' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} />
-          <button onClick={handleContinue} disabled={currentSpeaker !== null || isThinking} style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', marginRight: 8 }}><FastForward size={14} color="#9C8C74" /></button>
-          <button onClick={handleSendMessage} disabled={currentSpeaker !== null || isThinking} style={{ width: 32, height: 32, borderRadius: '50%', background: '#D4AF68', border: 'none', cursor: 'pointer' }}><Send size={16} color="#1A120E" /></button>
+          <button onClick={handleContinue} disabled={currentSpeaker !== null || isThinking} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', marginRight: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FastForward size={14} color="#9C8C74" /></button>
+          <button onClick={handleSendMessage} disabled={currentSpeaker !== null || isThinking} style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4AF68', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Send size={15} color="#1A120E" /></button>
         </div>
-        <div style={{ pointerEvents: 'auto' }}><button onClick={handleEndSession} style={{ padding: '0 24px', height: 44, borderRadius: 22, background: '#8A3A3A', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}><PhoneOff size={16} /> ABORT SESSION</button></div>
+        <div style={{ pointerEvents: 'auto' }}><button onClick={handleEndSession} style={{ padding: '0 24px', height: 44, borderRadius: 22, background: '#8A3A3A', border: '1px solid rgba(138, 58, 58, 0.5)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><PhoneOff size={16} /> END SESSION</button></div>
       </div>
     </div>
   );

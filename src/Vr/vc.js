@@ -733,7 +733,23 @@ const Vcs = ({ activeSim, onBack }) => {
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
   const [currentAnimation, setCurrentAnimation] = useState("Idle");
   const [isThinking, setIsThinking] = useState(false);
+  const [thinkingStep, setThinkingStep] = useState(0);
+  const thinkingIntervalRef = useRef(null);
+
+  const VC_THINKING_STEPS = [
+    'Power-Law Awareness',
+    'Asymmetric Risk Evaluation',
+    'Market Size & Expansion Thinking',
+    'Pattern Recognition Across Startups',
+    'Timing Sensitivity',
+    'Competitive & Ecosystem Modeling',
+    'Portfolio Construction Logic',
+    'Second-Order & Capital Market Thinking',
+    'Incentive & Deal Structure Awareness',
+  ];
   const [skipsUsed, setSkipsUsed] = useState(0);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitError, setLimitError] = useState('');
   const [accuracyScore, setAccuracyScore] = useState(0);
 
   const transcriptEndRef = useRef(null);
@@ -842,10 +858,11 @@ const Vcs = ({ activeSim, onBack }) => {
           alert('Authentication required. Please log in again.');
           window.location.href = '/login';
         } else if (error.response?.status === 403) {
-          alert(`Session start failed: ${error.response?.data?.error || 'Access denied'}\n\nPlease check your membership.`);
-          if (onBack) onBack();
+          const errMsg = error.response?.data?.error || 'Daily limit reached';
+          setLimitError(errMsg);
+          setShowLimitModal(true);
         } else {
-          alert('Failed to start session.');
+          console.warn('Session start error — falling back');
           if (onBack) onBack();
         }
       }
@@ -920,6 +937,19 @@ const Vcs = ({ activeSim, onBack }) => {
   };
 
   const handleEndSession = () => { setIsMeetingStarted(false); setShowReport(true); };
+
+  // Cycle through VC thinking steps while AI generates response
+  useEffect(() => {
+    if (isThinking) {
+      setThinkingStep(0);
+      thinkingIntervalRef.current = setInterval(() => {
+        setThinkingStep(prev => (prev + 1) % VC_THINKING_STEPS.length);
+      }, 600);
+    } else {
+      clearInterval(thinkingIntervalRef.current);
+    }
+    return () => clearInterval(thinkingIntervalRef.current);
+  }, [isThinking]);
 
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !sessionId) return;
@@ -1078,6 +1108,27 @@ const Vcs = ({ activeSim, onBack }) => {
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-app)', zIndex: 70, display: 'flex', flexDirection: 'column' }} className="fade-in">
+
+      {/* MEMBERSHIP LIMIT MODAL */}
+      {showLimitModal && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 380, background: 'var(--bg-card)', border: '1px solid var(--gold-dim)', borderRadius: 14, padding: 32, display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 0 60px rgba(212,175,55,0.15)', textAlign: 'center' }}>
+            <div style={{ fontSize: 38 }}>⏱️</div>
+            <div>
+              <h2 style={{ color: 'var(--text-primary)', margin: '0 0 8px 0', fontSize: 17, fontFamily: 'serif', letterSpacing: '0.05em' }}>Daily Limit Reached</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 12, margin: '0 0 6px 0', lineHeight: 1.6 }}>{limitError}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 11, margin: 0, lineHeight: 1.5 }}>Your daily VC simulation minutes are used up. Stack a VC_ONLY plan to get more minutes, or wait until tomorrow.</p>
+            </div>
+            <div style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '10px 14px' }}>
+              <p style={{ color: 'var(--gold-mid)', fontSize: 11, margin: 0, fontWeight: 700 }}>💡 Buy VC_ONLY to stack extra VC minutes on your current plan</p>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setShowLimitModal(false); if (onBack) onBack(); }} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 6, color: 'var(--text-primary)', fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'serif', letterSpacing: '0.05em' }}>← GO BACK</button>
+              <button onClick={() => window.location.href = '/upgrade'} style={{ flex: 1, padding: '10px 0', background: 'var(--gold-grad)', border: 'none', borderRadius: 6, color: '#1A0E06', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'serif', letterSpacing: '0.05em' }}>UPGRADE PLAN</button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{EXECUTIVE_THEME}</style>
       <style>{`
               .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -1134,13 +1185,21 @@ const Vcs = ({ activeSim, onBack }) => {
               </div>
             ))}
             {isThinking && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px', background: 'rgba(212, 175, 104, 0.05)', borderRadius: 8 }}>
-                <Brain size={12} color="var(--gold-mid)" />
-                <span style={{ color: 'var(--gold-mid)', fontSize: 9, fontWeight: 800, letterSpacing: '0.05em' }}>ANALYZING...</span>
-                <div style={{ display: 'flex', gap: 3, marginLeft: 'auto' }}>
-                  <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
-                  <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
-                  <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
+              <div style={{ padding: '8px 10px', background: 'rgba(212, 175, 104, 0.05)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                  <Brain size={10} color="var(--gold-mid)" />
+                  <span style={{ color: 'var(--gold-mid)', fontSize: 8, fontWeight: 800, letterSpacing: '0.08em' }}>EVALUATING PITCH</span>
+                  <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                    <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
+                    <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
+                    <div className="thinking-dot" style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--gold-mid)' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: 'rgba(212,175,55,0.07)', borderRadius: 4, border: '1px solid rgba(212,175,55,0.15)' }}>
+                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold-mid)', flexShrink: 0, animation: 'thinking 1s infinite ease-in-out', boxShadow: '0 0 5px rgba(212,175,55,0.7)' }} />
+                  <span style={{ color: 'var(--gold-mid)', fontSize: 9, fontWeight: 600, letterSpacing: '0.04em' }}>
+                    {VC_THINKING_STEPS[thinkingStep]}
+                  </span>
                 </div>
               </div>
             )}

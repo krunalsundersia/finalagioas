@@ -14,12 +14,33 @@ import {
   CreditCard, UserPlus, Link, Monitor, Maximize, Minimize, ArrowRight,
   ShoppingBag, Crown, Calendar, Check, ZapOff, LogOut, Edit, Mail, Camera
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';  // ADD THIS if not already there
+import { useNavigate } from 'react-router-dom';
 import VcsFile from './frontpages/VcsFrontpage';
 import BoardroomFile from './frontpages/BoardroomFrontpage';
 import CustomerFile from './frontpages/CustomerFrontpage';
 import CeoCoach from './frontpages/CeoCoachFrontpage';
 import { dashboardAPI } from './services/api';
+
+// ✅ NEW: Import user context for Gmail profile + membership
+import { useUser } from './context/UserContext';
+
+// ─── Membership display helpers ────────────────────────────────────────────
+const MEMBERSHIP_LABELS = {
+  balanced_daily: 'Balanced Daily',
+  boardroom_only: 'Boardroom',
+  ceo_only: 'CEO Coach',
+  vc_only: 'VC Pitch',
+  customer_only: 'Customer',
+  premium_daily: 'Premium',
+};
+const MEMBERSHIP_COLORS = {
+  balanced_daily: { bg: 'rgba(22,163,74,0.15)', text: '#4ade80', border: '#16a34a' },
+  boardroom_only: { bg: 'rgba(79,70,229,0.15)', text: '#818cf8', border: '#4f46e5' },
+  ceo_only: { bg: 'rgba(217,119,6,0.15)', text: '#fbbf24', border: '#d97706' },
+  vc_only: { bg: 'rgba(147,51,234,0.15)', text: '#c084fc', border: '#9333ea' },
+  customer_only: { bg: 'rgba(2,132,199,0.15)', text: '#38bdf8', border: '#0284c7' },
+  premium_daily: { bg: 'rgba(220,154,20,0.15)', text: '#ffd700', border: '#dc9a14' },
+};
 
 // --- CSS STYLES (PREMIUM WOODEN EXECUTIVE THEME) ---
 const GLOBAL_STYLES = `
@@ -394,6 +415,81 @@ const GLOBAL_STYLES = `
     gap: 16px;
     box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
   }
+
+  /* ✅ NEW: User avatar dropdown in top-bar */
+  .user-avatar-btn {
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .user-avatar-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border-gold);
+    object-fit: cover;
+  }
+  .user-avatar-fallback {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold-mid);
+  }
+  .membership-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+  .user-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    min-width: 220px;
+    background: #1e1610;
+    border: 1px solid var(--border-gold);
+    border-radius: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.9);
+    z-index: 1000;
+    overflow: hidden;
+  }
+  .user-dropdown-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .user-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .user-dropdown-item:hover { background: rgba(196,168,111,0.06); color: var(--text-primary); }
+  .user-dropdown-item.danger { color: var(--danger); }
+  .user-dropdown-item.danger:hover { background: rgba(138,58,58,0.1); }
 `;
 
 // --- HAMSTER LOADER (GOLD EDITION) ---
@@ -467,7 +563,7 @@ const PROFESSIONALS_DATA = {
     { id: 21, name: 'Gen. Maxwell', role: 'Tactical Advisor', experience: '40 Yrs', specialty: 'War Strategy', rate: 'Tactical', bio: 'Retired General. Applies battlefield tactics to competitive market dynamics.', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&h=200' },
     { id: 22, name: 'Prof. Yumi', role: 'Ethics Officer', experience: '15 Yrs', specialty: 'AI Safety', rate: 'Moral', bio: 'Academic researcher. Ensures your AI alignment isn\'t a PR disaster waiting to happen.', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&h=200' },
     { id: 23, name: 'Victor H.', role: 'Expansion Lead', experience: '14 Yrs', specialty: 'Global Markets', rate: 'Ambitious', bio: 'Opened markets in 40 countries. Knows the regulatory pitfalls of every region.', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&h=200' },
-    { id: 24, name: 'Sarah Jenkins', role: 'Culture Director', experience: '16 Yrs', specialty: 'Human Capital', rate: 'Empathic', bio: 'Focuses on retention and culture scaling. "People over pixels" philosophy.', avatar: 'https://images.unsplash.com/photo-1619895862022-09114b41f16f?auto=format&fit=crop&w=200&h=200' },
+    { id: 24, name: 'Sarah Jenkins', role: 'Culture Director', experience: '16 Yrs', specialty: 'Human Capital', rate: 'Empathic', bio: 'Focuses on retention and culture scaling. \"People over pixels\" philosophy.', avatar: 'https://images.unsplash.com/photo-1619895862022-09114b41f16f?auto=format&fit=crop&w=200&h=200' },
     { id: 25, name: 'The Silencer', role: 'Legal Defense', experience: 'Unknown', specialty: 'Litigation', rate: 'Ruthless', bio: 'You only call him when things are truly broken. He fixes it. No questions asked.', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&h=200' }
   ],
   customers: [
@@ -475,7 +571,7 @@ const PROFESSIONALS_DATA = {
     { id: 31, name: 'Confused Boomer', role: 'SMB Owner', experience: '30 Yrs', specialty: 'Basic Usage', rate: 'Frustrated', bio: 'Can\'t find the login button. Will call support 5 times a day.', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&h=200' },
     { id: 32, name: 'Procurement Mgr', role: 'Gatekeeper', experience: '10 Yrs', specialty: 'Cost Cutting', rate: 'Bureaucratic', bio: 'Bonus is tied to reducing your contract value by 20%. Good luck.', avatar: 'https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=200&h=200' },
     { id: 33, name: 'Tech Bro', role: 'Early Adopter', experience: '5 Yrs', specialty: 'Features', rate: 'Demanding', bio: 'Wants GraphQL support and dark mode or he walks.', avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&h=200' },
-    { id: 34, name: 'Budget SME', role: 'Bootstrap Founder', experience: '2 Yrs', specialty: 'Discount Seeking', rate: 'Cheap', bio: 'Bootstrapped. Will ask for a 90% discount in exchange for "exposure".', avatar: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?auto=format&fit=crop&w=200&h=200' },
+    { id: 34, name: 'Budget SME', role: 'Bootstrap Founder', experience: '2 Yrs', specialty: 'Discount Seeking', rate: 'Cheap', bio: 'Bootstrapped. Will ask for a 90% discount in exchange for \"exposure\".', avatar: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?auto=format&fit=crop&w=200&h=200' },
     { id: 35, name: 'Karen F.', role: 'Power User', experience: '8 Yrs', specialty: 'UX Critique', rate: 'Loud', bio: 'Knows your product better than you do. Will tweet about every bug.', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&h=200' }
   ],
   ceo: [
@@ -502,27 +598,139 @@ const CreativeRing = ({ label, value, color }) => (
   </div>
 );
 
+// ✅ NEW: Top-bar user avatar with dropdown
+const TopBarUser = ({ onNavigate, onLogout }) => {
+  const { profile, membership } = useUser();
+  const [open, setOpen] = useState(false);
+
+  const initials = profile
+    ? (profile.firstName?.[0] || profile.name?.[0] || 'U').toUpperCase()
+    : 'U';
+
+  const membershipLabel = membership ? (MEMBERSHIP_LABELS[membership.tier] || membership.tier) : null;
+  const membershipStyle = membership ? (MEMBERSHIP_COLORS[membership.tier] || MEMBERSHIP_COLORS.balanced_daily) : null;
+
+  return (
+    <div className="user-avatar-btn" onClick={() => setOpen(o => !o)}>
+      {/* Backdrop to close dropdown */}
+      {open && (
+        <div
+          onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+        />
+      )}
+
+      {/* Avatar */}
+      {profile?.picture ? (
+        <img
+          src={profile.picture}
+          alt={profile.name}
+          className="user-avatar-img"
+          referrerPolicy="no-referrer"
+          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+        />
+      ) : null}
+      <div className="user-avatar-fallback" style={{ display: profile?.picture ? 'none' : 'flex' }}>{initials}</div>
+
+      {/* Name + membership badge (shown in header) */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1 }}>
+          {profile?.firstName || profile?.name || 'User'}
+        </span>
+        {membershipLabel && membershipStyle && (
+          <span
+            className="membership-chip"
+            style={{ background: membershipStyle.bg, color: membershipStyle.text, borderColor: membershipStyle.border }}
+          >
+            ✦ {membershipLabel}
+          </span>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="user-dropdown" style={{ zIndex: 1000 }}>
+          <div className="user-dropdown-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border-gold)', flexShrink: 0 }}>
+                {profile?.picture
+                  ? <img src={profile.picture} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                  : null}
+                <div style={{ width: '100%', height: '100%', background: 'var(--bg-input)', display: profile?.picture ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-mid)', fontWeight: 700 }}>{initials}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{profile?.name || 'User'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{profile?.email || ''}</div>
+              </div>
+            </div>
+            {membershipLabel && membershipStyle && (
+              <div style={{ marginTop: 10 }}>
+                <span
+                  className="membership-chip"
+                  style={{ background: membershipStyle.bg, color: membershipStyle.text, borderColor: membershipStyle.border }}
+                >
+                  ✦ {membershipLabel}
+                </span>
+              </div>
+            )}
+          </div>
+          <div style={{ padding: '6px 0' }}>
+            <button className="user-dropdown-item" onClick={() => { setOpen(false); onNavigate('/upgrade'); }}>
+              <Crown size={14} /> Upgrade Plan
+            </button>
+            <button className="user-dropdown-item" onClick={() => { setOpen(false); onNavigate('/dashboard'); }}>
+              <Layout size={14} /> Dashboard
+            </button>
+            <button className="user-dropdown-item danger" onClick={() => { setOpen(false); onLogout(); }}>
+              <LogOut size={14} /> Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Dashboard = () => {
   // --- STATE ---
   const [isAppLoaded, setIsAppLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const navigate = useNavigate();  // ADD THIS LINE
+  const navigate = useNavigate();
 
+  // ✅ NEW: Pull real user data from context
+  const { profile: googleProfile, membership: googleMembership, logout } = useUser();
 
   // Simulation State
-  const [activeSim, setActiveSim] = useState(null);
+  const [activeSim] = useState(null); // always null - sims navigate via URL
 
   // Data
   const [projects, setProjects] = useState([]);
   const [newProject, setNewProject] = useState({ title: '', desc: '' });
   const [settings, setSettings] = useState({ salesAggression: 75, vcSkepticism: 80, crisisPressure: 60, techDetail: 90 });
-  const [userProfile, setUserProfile] = useState({
-    name: 'Kunal Sundersia',
-    role: 'Founder & CEO',
-    email: 'kunal@asklurk.com',
-    avatar: 'KS'
-  });
+
+  // ✅ UPDATED: userProfile now reads from Google profile first, falls back to defaults
+  // ✅ FIX B: Profile — always read live from googleProfile, only 'role' is user-editable
+  // Derive display values directly from Google auth so they're always in sync with login
+  const [userRole, setUserRole] = useState('');
+
+  const userProfile = {
+    name: googleProfile?.name || googleProfile?.givenName || '',
+    email: googleProfile?.email || '',
+    picture: googleProfile?.picture || googleProfile?.imageUrl || null,
+    avatar: googleProfile?.firstName
+      ? (googleProfile.firstName[0] + (googleProfile.lastName?.[0] || '')).toUpperCase()
+      : googleProfile?.name
+        ? googleProfile.name[0].toUpperCase()
+        : 'U',
+    role: userRole,
+  };
+
+  // Keep setUserProfile working for role edits only
+  const setUserProfile = (updater) => {
+    const next = typeof updater === 'function' ? updater(userProfile) : updater;
+    if (next.role !== undefined) setUserRole(next.role);
+  };
 
   // New state for Activity tab filters
   const [activityFilter, setActivityFilter] = useState('all');
@@ -535,25 +743,50 @@ const Dashboard = () => {
     ceo: { performance_percentage: 0, total_time_seconds: 0, active_time_seconds: 0 }
   });
 
-  // Activity Log Data with timestamps
-  const activityLog = [
-    { id: 1, action: 'System Ready', detail: 'Asklurk OS Online', time: '08:00 AM', date: '2024-01-15', timestamp: '2024-01-15T08:00:00' },
-    { id: 2, action: 'VC Pitch Simulation Started', detail: 'Series A Defense with Sarah Vance', time: '10:30 AM', date: '2024-01-15', timestamp: '2024-01-15T10:30:00' },
-    { id: 3, action: 'Data Upload Completed', detail: 'Pitch Deck Analyzed Successfully', time: '02:15 PM', date: '2024-01-15', timestamp: '2024-01-15T14:15:00' },
-    { id: 4, action: 'Sales Gauntlet Completed', detail: 'Negotiation Score: 85%', time: '04:45 PM', date: '2024-01-14', timestamp: '2024-01-14T16:45:00' },
-    { id: 5, action: 'Financial Data Updated', detail: 'MRR increased to $15,000', time: '11:20 AM', date: '2024-01-14', timestamp: '2024-01-14T11:20:00' },
-    { id: 6, action: 'CEO Coach Session', detail: 'Strategy review with Honest Mentor', time: '03:00 PM', date: '2024-01-13', timestamp: '2024-01-13T15:00:00' },
-    { id: 7, action: 'Crisis Management Test', detail: 'PR response simulation', time: '09:15 AM', date: '2024-01-12', timestamp: '2024-01-12T09:15:00' },
-    { id: 8, action: 'Team Data Added', detail: 'Updated headcount information', time: '01:45 PM', date: '2024-01-12', timestamp: '2024-01-12T13:45:00' },
-    { id: 9, action: 'Monthly Report Generated', detail: 'Performance analytics compiled', time: '05:30 PM', date: '2024-01-11', timestamp: '2024-01-11T17:30:00' },
-    { id: 10, action: 'Account Settings Updated', detail: 'AI behavior tuning modified', time: '10:00 AM', date: '2024-01-11', timestamp: '2024-01-11T10:00:00' },
-  ];
+  // ─── ACTIVITY LOG: Real events, persisted in localStorage ─────────────────
+  const ACTIVITY_STORAGE_KEY = 'asklurk_activity_log';
 
-  // Filter activity log based on selected filter
+  const [activityLog, setActivityLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('asklurk_activity_log') || '[]'); }
+    catch { return []; }
+  });
+
+  // Call this anywhere to log an event into the Activity tab
+  const logActivity = React.useCallback((action, detail, type = 'system') => {
+    const now = new Date();
+    const entry = {
+      id: Date.now() + Math.random(),
+      action,
+      detail,
+      type, // 'auth' | 'simulation' | 'payment' | 'profile' | 'system'
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      date: now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+      timestamp: now.toISOString(),
+    };
+    setActivityLog(prev => {
+      const updated = [entry, ...prev].slice(0, 200);
+      localStorage.setItem('asklurk_activity_log', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // Log sign-in once per browser session
+  const sessionLoginLogged = React.useRef(false);
+  useEffect(() => {
+    if (googleProfile && !sessionLoginLogged.current) {
+      sessionLoginLogged.current = true;
+      logActivity(
+        'Signed In',
+        `${googleProfile.name || googleProfile.email} authenticated via Google`,
+        'auth'
+      );
+    }
+  }, [googleProfile, logActivity]);
+
+  // Filter activity log
   const filteredActivityLog = activityLog.filter(item => {
     const now = new Date();
     const itemDate = new Date(item.timestamp);
-
     switch (activityFilter) {
       case 'today':
         return itemDate.toDateString() === now.toDateString();
@@ -569,7 +802,7 @@ const Dashboard = () => {
     }
   });
 
-  // --- EFFECTS ---
+  // --- EFFE-- EFFECTS ---
 
   // App Loader
   useEffect(() => {
@@ -583,30 +816,25 @@ const Dashboard = () => {
     document.getElementsByTagName('head')[0].appendChild(link);
 
     const img = new Image();
-    img.src = 'favicon.ico'; // Make sure this path is correct
+    img.src = 'favicon.ico';
 
     img.onload = () => {
-      // 1. Create a square canvas (standard favicon size)
       const canvas = document.createElement('canvas');
       const size = 64;
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
 
-      // 2. Calculate aspect ratio to "contain" the image (no squishing)
       const scale = Math.min(size / img.width, size / img.height);
       const width = img.width * scale;
       const height = img.height * scale;
 
-      // 3. Center the image on the canvas
       const x = (size - width) / 2;
       const y = (size - height) / 2;
 
-      // 4. Draw
       ctx.clearRect(0, 0, size, size);
       ctx.drawImage(img, x, y, width, height);
 
-      // 5. Update the favicon link
       link.href = canvas.toDataURL('image/ico');
     };
   }, []);
@@ -621,14 +849,11 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Error fetching dashboard analytics:', error);
-        // Keep showing zeros on error
       }
     };
 
-    // Fetch immediately
     fetchDashboardAnalytics();
 
-    // Then fetch every 5 seconds for live updates
     const interval = setInterval(fetchDashboardAnalytics, 5000);
 
     return () => clearInterval(interval);
@@ -637,8 +862,7 @@ const Dashboard = () => {
   // --- HANDLERS ---
   const handleCreateProject = () => { if (newProject.title) { setProjects([...projects, { id: Date.now(), title: newProject.title, desc: newProject.desc }]); setShowProjectModal(false); } };
   const handleSettingChange = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
-  const handleProfileUpdate = (key, val) => setUserProfile(prev => ({ ...prev, [key]: val }));
-
+  const handleProfileUpdate = (key, val) => { if (key === 'role') setUserRole(val); }; // name/email/picture come from Google auth
 
   // NEW: Helper function to format seconds to readable time
   const formatTime = (seconds) => {
@@ -706,7 +930,7 @@ const Dashboard = () => {
                   { label: 'CEO', data: dashboardAnalytics.ceo }
                 ].map((sim, i) => {
                   const totalTime = (sim.data?.total_time_seconds || 0) + (sim.data?.active_time_seconds || 0);
-                  const maxTime = 3600; // 1 hour for scaling
+                  const maxTime = 3600;
                   const heightPercentage = Math.min((totalTime / maxTime) * 100, 100);
                   const isActive = (sim.data?.active_time_seconds || 0) > 0;
 
@@ -762,60 +986,69 @@ const Dashboard = () => {
         </div>
       );
       case 'simulations':
-        if (activeSim) {
-          // --- ROUTING LOGIC FOR SPECIFIC SIMULATION FILES ---
-          if (activeSim.title === 'VC Pitch Defense') {
-            return <VcsFile activeSim={activeSim} onBack={() => setActiveSim(null)} />;
-          }
-          if (activeSim.title === 'Crisis Management') {
-            return <BoardroomFile activeSim={activeSim} onBack={() => setActiveSim(null)} />;
-          }
-          if (activeSim.title === 'Sales Gauntlet') {
-            return <CustomerFile activeSim={activeSim} onBack={() => setActiveSim(null)} />;
-          }
-          if (activeSim.title === 'Honest CEO') {
-            return <CeoCoach activeSim={activeSim} onBack={() => setActiveSim(null)} />;
-          }
-
-          // Default View for other simulations (with Abstract 3D Placeholder)
-          return (
-            <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-app)', zIndex: 60, display: 'flex' }} className="fade-in">
-              <div style={{ width: 360, background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-gold)', padding: 40, display: 'flex', flexDirection: 'column', backdropFilter: 'blur(20px)', boxShadow: '20px 0 60px rgba(0,0,0,0.8)' }}>
-                <button className="btn-reset" onClick={() => setActiveSim(null)} style={{ justifyContent: 'flex-start', color: 'var(--text-tertiary)', marginBottom: 40, fontSize: 10, fontWeight: 700, letterSpacing: '1px' }}><ArrowLeft size={12} style={{ marginRight: 6 }} /> RETURN TO LOBBY</button>
-                <div style={{ marginBottom: 40 }}><div className="form-label" style={{ color: 'var(--gold-mid)' }}>Active Session</div><h2 style={{ fontSize: 32, margin: '4px 0' }}>{activeSim.title}</h2><div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{activeSim.risk} Stakes Environment</div></div>
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  <div className="card" style={{ background: 'rgba(0,0,0,0.2)', marginBottom: 24, padding: 24, border: '1px solid var(--border-subtle)' }}>
-                    <div className="form-label">Mission Objectives</div>
-                    {activeSim.points.map((p, i) => <div key={i} style={{ fontSize: 13, marginBottom: 10, display: 'flex', gap: 10, color: 'var(--text-primary)' }}><div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold-dim)', marginTop: 8 }} />{p}</div>)}
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 24 }}><button className="btn-reset" style={{ border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 4, height: 36, fontSize: 10, fontWeight: 700, letterSpacing: '1px' }} onClick={() => setActiveSim(null)}>TERMINATE</button><button className="btn-gold" style={{ height: 36, fontSize: 10 }}><Mic size={14} /> COMMENCE</button></div>
-              </div>
-              <div style={{ flex: 1, position: 'relative', background: '#000' }}>
-                <Canvas camera={{ position: [0, 1, 5], fov: 50 }}>
-                  <Suspense fallback={<Html center><HamsterLoader /></Html>}>
-                    <ambientLight intensity={0.5} />
-                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
-                    <pointLight position={[-10, -10, -10]} />
-                    <AbstractModel />
-                    <Environment preset="city" />
-                    <OrbitControls />
-                  </Suspense>
-                </Canvas>
-              </div>
-            </div>
-          );
-        }
         return (
           <div className="content-max fade-in">
             <h1>Strategic Wargames</h1>
             <div className="grid-layout">
-              {SIMULATIONS_DATA.map((sim, i) => (
-                <div key={sim.id} className={`card stagger-appear delay-${i + 1}`} style={{ justifyContent: 'space-between' }}>
-                  <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}><h3 style={{ fontSize: 20 }}>{sim.title}</h3><span style={{ fontSize: 10, fontWeight: 700, color: sim.risk === 'High' || sim.risk === 'Critical' ? 'var(--danger)' : 'var(--success)', border: sim.risk === 'High' || sim.risk === 'Critical' ? '1px solid var(--danger)' : '1px solid var(--success)', padding: '4px 10px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{sim.risk}</span></div><ul style={{ listStyle: 'none', padding: 0, margin: '16px 0' }}>{sim.points.map((pt, i) => <li key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', gap: 10 }}><div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-gold)', marginTop: 8 }} /> {pt}</li>)}</ul></div>
-                  <button className="btn-gold" onClick={() => setActiveSim(sim)}><Play size={14} /> Commence Exercise</button>
-                </div>
-              ))}
+              {SIMULATIONS_DATA.map((sim, i) => {
+                // Map each sim title to its base URL path
+                const simRoutes = {
+                  'VC Pitch Defense': '/vc/frontpage',
+                  'Crisis Management': '/boardroom/frontpage',
+                  'Sales Gauntlet': '/customer/frontpage',
+                  'Honest CEO': '/ceo/frontpage',
+                };
+                const basePath = simRoutes[sim.title] || '/dashboard';
+
+                return (
+                  <div key={sim.id} className={`card stagger-appear delay-${i + 1}`} style={{ justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <h3 style={{ fontSize: 20 }}>{sim.title}</h3>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: sim.risk === 'High' || sim.risk === 'Critical' ? 'var(--danger)' : 'var(--success)', border: sim.risk === 'High' || sim.risk === 'Critical' ? '1px solid var(--danger)' : '1px solid var(--success)', padding: '4px 10px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{sim.risk}</span>
+                      </div>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0' }}>
+                        {sim.points.map((pt, i) => (
+                          <li key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', gap: 10 }}>
+                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-gold)', marginTop: 8 }} /> {pt}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {/* Two launch buttons: 3D and Chat */}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        className="btn-gold"
+                        style={{ flex: 1, height: 44, fontSize: 11 }}
+                        onClick={() => {
+                          logActivity(
+                            `${sim.title} Launched`,
+                            `Entered ${sim.title} in 3D Immersive Mode`,
+                            'simulation'
+                          );
+                          navigate(`${basePath}/3d`);
+                        }}
+                      >
+                        <Play size={13} /> 3D Mode
+                      </button>
+                      <button
+                        className="btn-reset"
+                        style={{ flex: 1, height: 44, fontSize: 11, border: '1px solid var(--gold-dim)', color: 'var(--gold-dim)', borderRadius: 2, fontWeight: 700, letterSpacing: '0.1em' }}
+                        onClick={() => {
+                          logActivity(
+                            `${sim.title} Launched`,
+                            `Entered ${sim.title} in Chat Mode`,
+                            'simulation'
+                          );
+                          navigate(`${basePath}/chat`);
+                        }}
+                      >
+                        <MessageSquare size={13} style={{ marginRight: 6 }} /> Chat Mode
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -965,10 +1198,16 @@ const Dashboard = () => {
           <div className="content-max fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
               <h1>Executive Audit Trail</h1>
-              <button className="btn-reset" style={{ fontSize: 12, padding: '10px 24px', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}><Download size={14} /> Extract Data</button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-reset" style={{ fontSize: 12, padding: '10px 24px', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}><Download size={14} /> Extract Data</button>
+                <button className="btn-reset" onClick={() => {
+                  localStorage.removeItem('asklurk_activity_log');
+                  setActivityLog([]);
+                }} style={{ fontSize: 12, padding: '10px 16px', border: '1px solid var(--danger)', borderRadius: 4, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}><Trash2 size={14} /> Clear Log</button>
+              </div>
             </div>
 
-            {/* Activity Filter Toggle - UPDATED TO WHITE/BONE THEME */}
+            {/* Activity Filter Toggle */}
             <div className="stagger-appear delay-1" style={{ marginBottom: 32 }}>
               <div style={{ display: 'flex', gap: 8, width: 'fit-content' }}>
                 <button className={`btn-toggle ${activityFilter === 'today' ? 'active' : ''}`} onClick={() => setActivityFilter('today')}>Today</button>
@@ -982,21 +1221,44 @@ const Dashboard = () => {
             </div>
 
             <div className="card stagger-appear delay-2" style={{ marginTop: 0, padding: 0 }}>
-              {filteredActivityLog.map(log => (
-                <div key={log.id} style={{ display: 'flex', gap: 24, padding: '24px 32px', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center' }}>
-                  <div style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.02)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Activity size={18} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, color: 'var(--text-primary)' }}>{log.action}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{log.detail}</div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-tertiary)' }}>{log.time}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>{log.date}</div>
-                  </div>
+              {filteredActivityLog.length === 0 ? (
+                <div style={{ padding: '60px 32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <Activity size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
+                  <div style={{ fontSize: 14, marginBottom: 6 }}>No activity yet</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Events will appear here as you use the platform.</div>
                 </div>
-              ))}
+              ) : (
+                filteredActivityLog.map((log, idx) => {
+                  // Icon + color per event type
+                  const typeConfig = {
+                    auth: { icon: <User size={16} />, color: '#4ade80', bg: 'rgba(74,222,128,0.08)', label: 'AUTH' },
+                    simulation: { icon: <Play size={16} />, color: 'var(--gold-mid)', bg: 'rgba(220,154,20,0.08)', label: 'SIM' },
+                    payment: { icon: <CreditCard size={16} />, color: '#c084fc', bg: 'rgba(192,132,252,0.08)', label: 'PAYMENT' },
+                    profile: { icon: <Edit size={16} />, color: '#38bdf8', bg: 'rgba(56,189,248,0.08)', label: 'PROFILE' },
+                    system: { icon: <Activity size={16} />, color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.03)', label: 'SYSTEM' },
+                  };
+                  const cfg = typeConfig[log.type] || typeConfig.system;
+                  const isLast = idx === filteredActivityLog.length - 1;
+                  return (
+                    <div key={log.id} style={{ display: 'flex', gap: 20, padding: '20px 32px', borderBottom: isLast ? 'none' : '1px solid var(--border-subtle)', alignItems: 'center' }}>
+                      <div style={{ width: 40, height: 40, background: cfg.bg, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: cfg.color, flexShrink: 0 }}>
+                        {cfg.icon}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{log.action}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}33`, padding: '2px 6px', borderRadius: 3, letterSpacing: '0.08em', flexShrink: 0 }}>{cfg.label}</span>
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.detail}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                        <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-tertiary)' }}>{log.time}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>{log.date}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         );
@@ -1005,17 +1267,31 @@ const Dashboard = () => {
           { name: 'Starter', price: '$0', features: ['500 daily requests', 'Limited Access', 'Community Support'], recommended: false, color: '#3A3A3A' },
           { name: 'Founder', price: '$49', features: ['2,000 daily requests', 'Full Board Access', 'Basic Analytics'], recommended: false, color: '#261C16' },
           { name: 'Professional', price: '$99', features: ['3,500 daily requests', 'Reduced Latency', 'Priority Support'], recommended: false, color: '#2A201A' },
-          { name: 'Executive', price: '$149', features: ['5,000 daily requests', 'Advanced Intelligence', 'Concierge Onboarding'], recommended: true, color: 'linear-gradient(180deg, #2A1D16 0%, #1A120E 100%)' },
+          { name: 'Executive', price: '$149', features: ['5,000 daily requests', 'Advanced Intelligence', 'Concierge Onboarding'], recommended: false, color: 'linear-gradient(180deg, #2A1D16 0%, #1A120E 100%)' },
           { name: 'Global Elite', price: '$499', features: ['Unlimited Requests', 'Custom Training', 'Dedicated Account Manager'], recommended: false, color: '#100C0A' },
           { name: 'Enterprise', price: 'Custom', features: ['API Access', 'SSO / SAML', 'SLA Guarantees'], recommended: false, color: '#261C16' },
         ];
+
+        // ✅ FIX 2: Derive active plan name from googleMembership tier
+        const tierToPlanName = {
+          founder: 'Founder',
+          professional: 'Professional',
+          executive: 'Executive',
+          global_elite: 'Global Elite',
+          enterprise: 'Enterprise',
+          balanced_daily: 'Founder',
+          premium_daily: 'Executive',
+        };
+        const activePlanName = googleMembership?.tier
+          ? tierToPlanName[googleMembership.tier] || null
+          : null;
 
         return (
           <div className="content-max fade-in">
             <h1 style={{ marginBottom: 8 }}>Capital & Resource Allocation</h1>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 40 }}>System preferences and integrations.</p>
 
-            {/* Upgrade Section - Added */}
+            {/* Upgrade Section */}
             <div className="card stagger-appear delay-1" style={{ marginBottom: 32 }}>
               <div className="section-header" style={{ border: 0, padding: 0, marginBottom: 24 }}>
                 <CreditCard size={24} color="var(--gold-mid)" />
@@ -1025,29 +1301,51 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="grid-layout" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-                {plans.map((plan, i) => (
-                  <div key={plan.name} className="card" style={{ padding: 24, background: plan.color, border: plan.recommended ? '1px solid var(--gold-mid)' : '1px solid var(--border-gold)', position: 'relative' }}>
-                    {plan.recommended && <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, color: 'var(--gold-mid)', background: 'rgba(212, 175, 104, 0.1)', padding: '4px 8px', borderRadius: 4, fontWeight: 700 }}>RECOMMENDED</span>}
-                    <h3 style={{ fontSize: 18, marginBottom: 12 }}>{plan.name} Plan</h3>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: plan.recommended ? 'var(--gold-bright)' : 'var(--gold-mid)', fontFamily: 'var(--font-display)', marginBottom: 16 }}>{plan.price}<span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>/mo</span></div>
-                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-                      {plan.features.map((feat, k) => (
-                        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><Check size={14} /> {feat}</div>
-                      ))}
+                {plans.map((plan, i) => {
+                  // ✅ FIX 2b: Highlight the plan the logged-in user actually owns
+                  const isActive = activePlanName === plan.name;
+                  return (
+                    <div key={plan.name} className="card" style={{
+                      padding: 24,
+                      background: plan.color,
+                      border: isActive ? '2px solid var(--gold-bright)' : '1px solid var(--border-gold)',
+                      position: 'relative',
+                      boxShadow: isActive ? '0 0 24px rgba(255, 215, 0, 0.18), 0 0 0 1px rgba(255,215,0,0.08)' : undefined,
+                    }}>
+                      {isActive && (
+                        <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, color: '#1A120E', background: 'var(--gold-grad)', padding: '4px 10px', borderRadius: 4, fontWeight: 700, letterSpacing: 0.5 }}>
+                          YOUR PLAN
+                        </span>
+                      )}
+                      <h3 style={{ fontSize: 18, marginBottom: 12 }}>{plan.name} Plan</h3>
+                      <div style={{ fontSize: 32, fontWeight: 700, color: isActive ? 'var(--gold-bright)' : 'var(--gold-mid)', fontFamily: 'var(--font-display)', marginBottom: 16 }}>{plan.price}<span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>/mo</span></div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                        {plan.features.map((feat, k) => (
+                          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><Check size={14} /> {feat}</div>
+                        ))}
+                      </div>
+                      <button className="btn-gold" style={{ width: '100%', height: 40, fontSize: 12, background: isActive ? 'var(--gold-grad)' : 'transparent', color: isActive ? '#1A120E' : 'var(--gold-dim)' }}
+                        onClick={() => {
+                          if (!isActive) {
+                            logActivity('Plan Selected', `${plan.name} Plan (${plan.price}/mo) — proceeding to checkout`, 'payment');
+                            navigate('/upgrade');
+                          }
+                        }}
+                      >
+                        {isActive ? 'Active Commission' : 'Select Plan'}
+                      </button>
                     </div>
-                    <button className="btn-gold" style={{ width: '100%', height: 40, fontSize: 12, background: plan.recommended ? 'var(--gold-grad)' : 'transparent', color: plan.recommended ? '#1A120E' : 'var(--gold-dim)' }}>{plan.name === 'Founder' ? 'Active Commission' : 'Select Plan'}</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Usage Limits Section - Modified */}
+            {/* Usage Limits Section */}
             <div className="grid-layout" style={{ marginBottom: 32 }}>
               <div className="card stagger-appear delay-2">
                 <h3>Active Commission</h3>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold-mid)', fontFamily: 'var(--font-display)', marginTop: 16 }}>Founder Plan</div>
 
-                {/* Daily Limit */}
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
                   <span>Operational Throughput (Daily)</span>
                   <span>850 / 2,000 Operations</span>
@@ -1057,7 +1355,6 @@ const Dashboard = () => {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>Resets in 12 hours</div>
 
-                {/* Monthly Limit */}
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
                   <span>Strategic Bandwidth (Monthly)</span>
                   <span>25,400 / 60,000 Operations</span>
@@ -1088,7 +1385,6 @@ const Dashboard = () => {
                   ))}
                 </div>
 
-                {/* Usage Summary */}
                 <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Wargames This Month</span>
@@ -1102,27 +1398,31 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Billing History */}
+            {/* Billing History — ✅ FIX 3: Only show real transactions from membership data */}
             <div className="card stagger-appear delay-4">
               <h3 style={{ marginBottom: 24 }}>Ledger History</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 14, alignItems: 'center' }}>
-                <span>Oct 1, 2025</span>
-                <span>Founder Plan</span>
-                <span>$49.00</span>
-                <span style={{ color: 'var(--success)', background: 'rgba(93, 122, 88, 0.1)', padding: '4px 12px', borderRadius: 4, fontSize: 12 }}>Settled</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 14, alignItems: 'center' }}>
-                <span>Sep 1, 2025</span>
-                <span>Founder Plan</span>
-                <span>$49.00</span>
-                <span style={{ color: 'var(--success)', background: 'rgba(93, 122, 88, 0.1)', padding: '4px 12px', borderRadius: 4, fontSize: 12 }}>Settled</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 0', fontSize: 14, alignItems: 'center' }}>
-                <span>Aug 1, 2025</span>
-                <span>Founder Plan</span>
-                <span>$49.00</span>
-                <span style={{ color: 'var(--success)', background: 'rgba(93, 122, 88, 0.1)', padding: '4px 12px', borderRadius: 4, fontSize: 12 }}>Settled</span>
-              </div>
+              {(() => {
+                const transactions = googleMembership?.billing_history || googleMembership?.transactions || [];
+                if (!transactions || transactions.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+                      <CreditCard size={32} color="var(--gold-dim)" style={{ marginBottom: 12, opacity: 0.4 }} />
+                      <div style={{ fontSize: 14, marginBottom: 6 }}>No transactions yet</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Your purchase history will appear here after your first payment.</div>
+                    </div>
+                  );
+                }
+                return transactions.map((txn, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 0', borderBottom: i < transactions.length - 1 ? '1px solid var(--border-subtle)' : 'none', fontSize: 14, alignItems: 'center' }}>
+                    <span>{txn.date || txn.created_at || '—'}</span>
+                    <span>{txn.plan || txn.description || '—'}</span>
+                    <span>${typeof txn.amount === 'number' ? txn.amount.toFixed(2) : txn.amount || '—'}</span>
+                    <span style={{ color: 'var(--success)', background: 'rgba(93, 122, 88, 0.1)', padding: '4px 12px', borderRadius: 4, fontSize: 12 }}>
+                      {txn.status || 'Settled'}
+                    </span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         );
@@ -1156,37 +1456,63 @@ const Dashboard = () => {
                     >
                       <Crown size={14} /> UPGRADE PLAN
                     </button>
-                    <button className="btn-reset" style={{ color: 'var(--danger)', fontSize: 12, gap: 8, border: '1px solid var(--danger)', padding: '6px 12px', borderRadius: 4 }}>
+                    {/* ✅ LOG OUT now calls the real logout function */}
+                    <button
+                      className="btn-reset"
+                      style={{ color: 'var(--danger)', fontSize: 12, gap: 8, border: '1px solid var(--danger)', padding: '6px 12px', borderRadius: 4 }}
+                      onClick={() => {
+                        logActivity('Signed Out', `${googleProfile?.name || googleProfile?.email || 'User'} signed out`, 'auth');
+                        setTimeout(logout, 100);
+                      }}
+                    >
                       <LogOut size={14} /> LOG OUT
                     </button>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                  {/* ✅ UPDATED: Shows Gmail photo if available, initials otherwise */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 100, height: 100, borderRadius: '50%', background: 'var(--gold-grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: '#0F0C08', boxShadow: 'var(--gold-glow)', position: 'relative' }}>
-                      {userProfile.avatar}
-                      <div style={{ position: 'absolute', bottom: 0, right: 0, background: '#1A120E', border: '1px solid var(--gold-mid)', padding: 6, borderRadius: '50%', cursor: 'pointer' }}>
+                    <div style={{ width: 100, height: 100, borderRadius: '50%', background: 'var(--gold-grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: '#0F0C08', boxShadow: 'var(--gold-glow)', position: 'relative', overflow: 'hidden' }}>
+                      {userProfile.picture ? (
+                        <img
+                          src={userProfile.picture}
+                          alt={userProfile.name}
+                          referrerPolicy="no-referrer"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, zIndex: 1 }}
+                          onError={(e) => { e.target.style.display = 'none'; document.getElementById('dossier-avatar-initials').style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <span id="dossier-avatar-initials" style={{ display: userProfile.picture ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                        {userProfile.avatar}
+                      </span>
+                      <div style={{ position: 'absolute', bottom: 0, right: 0, background: '#1A120E', border: '1px solid var(--gold-mid)', padding: 6, borderRadius: '50%', cursor: 'pointer', zIndex: 2 }}>
                         <Camera size={14} color="var(--gold-mid)" />
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Format: JPG, PNG</div>
+                    {/* ✅ Shows Gmail address below avatar */}
+                    {googleProfile?.email && (
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textAlign: 'center', maxWidth: 120, wordBreak: 'break-all' }}>
+                        {googleProfile.email}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                     <div>
-                      <label className="form-label">Full Name</label>
-                      <input className="form-input" value={userProfile.name} onChange={(e) => handleProfileUpdate('name', e.target.value)} />
+                      <label className="form-label">Full Name <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', letterSpacing: 0, fontSize: 10 }}>— synced from Google</span></label>
+                      <input className="form-input" value={userProfile.name} readOnly style={{ opacity: 0.8, cursor: 'default' }} />
                     </div>
                     <div>
                       <label className="form-label">Title / Role</label>
-                      <input className="form-input" value={userProfile.role} onChange={(e) => handleProfileUpdate('role', e.target.value)} />
+                      <input className="form-input" value={userProfile.role} onChange={(e) => handleProfileUpdate('role', e.target.value)} placeholder="e.g. Founder & CEO" />
                     </div>
                     <div style={{ gridColumn: 'span 2' }}>
-                      <label className="form-label">Secure Communication Channel</label>
+                      <label className="form-label">Secure Communication Channel <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', letterSpacing: 0, fontSize: 10 }}>— synced from Google</span></label>
                       <div style={{ position: 'relative' }}>
                         <Mail size={16} style={{ position: 'absolute', top: 16, left: 16, color: 'var(--text-secondary)' }} />
-                        <input className="form-input" style={{ paddingLeft: 44 }} value={userProfile.email} onChange={(e) => handleProfileUpdate('email', e.target.value)} />
+                        <input className="form-input" style={{ paddingLeft: 44, opacity: 0.8, cursor: 'default' }} value={userProfile.email} readOnly />
                       </div>
                     </div>
                     <div>
@@ -1196,7 +1522,9 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 32 }}>
-                  <button className="btn-gold" style={{ height: 40, fontSize: 12 }}>Update Dossier</button>
+                  <button className="btn-gold" style={{ height: 40, fontSize: 12 }} onClick={() => {
+                    logActivity('Profile Updated', `Dossier saved — Role: "${userProfile.role || 'not set'}"`, 'profile');
+                  }}>Update Dossier</button>
                 </div>
               </div>
 
@@ -1263,7 +1591,12 @@ const Dashboard = () => {
           {!activeSim && (
             <div className="top-bar">
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 10, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Asklurk OS <ChevronRight size={10} /> {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</div>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-input)', border: '1px solid var(--border-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--gold-mid)' }}>KS</div>
+
+              {/* ✅ REPLACED hardcoded "KS" circle with real Gmail avatar + name + membership */}
+              <TopBarUser
+                onNavigate={navigate}
+                onLogout={logout}
+              />
             </div>
           )}
           <div className="scroll-view" style={{ padding: activeSim ? 0 : 48 }}>{renderContent()}</div>

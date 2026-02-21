@@ -225,6 +225,26 @@ const BoardroomChat = ({ config, onBack }) => {
           console.log('✅ WebSocket connected');
           setIsWsConnected(true);
 
+          // ✅ FIXED BUG: Send company context so AI knows what meeting this is about
+          // config is the meetingConfig object from BoardroomFrontpage (has .context nested inside)
+          const ctxSource = config?.context || config || {};
+          ws.send(JSON.stringify({
+            type: 'company_context',
+            context: {
+              title: ctxSource.title || 'Boardroom Session',
+              meetingAim: ctxSource.meetingAim || '',
+              agendaText: ctxSource.agendaText || '',
+              meetingType: ctxSource.meetingType || 'Quarterly Review',
+              companyStage: ctxSource.companyStage || 'Growth (Series B+)',
+              strategicFocus: ctxSource.strategicFocus || '',
+              companyHealth: ctxSource.companyHealth || 'Stable Growth',
+              discussionHorizon: ctxSource.discussionHorizon || 'Strategic (Long-Term)',
+              adaptiveData: ctxSource.adaptiveData || {},
+              boardMembers: ctxSource.boardMembers || [],
+            }
+          }));
+          console.log('📊 Boardroom context sent:', ctxSource.meetingAim || ctxSource.title);
+
           setTimeout(() => {
             const ceo = boardMembers[0];
             setMessages(prev => [...prev, {
@@ -661,21 +681,42 @@ const BoardroomChat = ({ config, onBack }) => {
       )}
 
       {/* --- END SCREEN --- */}
-      {isMeetingEnded && (
-        <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', zIndex: 3000 }}>
-          <div className="smooth-transition" style={{ width: '100%', maxWidth: 550, background: '#1A120E', border: `1px solid ${colors.border}`, borderRadius: 12, padding: 50, textAlign: 'center', boxShadow: '0 50px 100px rgba(0,0,0,1)', display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'scaleIn 0.5s ease' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 32, border: `1px solid ${endReason.includes("Violation") ? colors.danger : colors.success}` }}>{endReason.includes("Violation") ? <AlertTriangle size={32} color={colors.danger} /> : <CheckCircle size={32} color={colors.success} />}</div>
-            <h1 className="cinzel-font" style={{ color: colors.textMain, fontSize: 32, marginBottom: 12, letterSpacing: '0.1em' }}>SESSION CONCLUDED</h1>
-            <div style={{ color: colors.gold, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 40 }}>{endReason}</div>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 40 }}>
-              <button className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><FileText size={18} color={colors.gold} /> Full Session Report (PDF)</div><Download size={16} color={colors.textDim} /></button>
-              <button className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><FileBarChart size={18} color={colors.gold} /> Executive Summary</div><Download size={16} color={colors.textDim} /></button>
-              <button className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><MessageSquare size={18} color={colors.gold} /> Chat Transcript (TXT)</div><Download size={16} color={colors.textDim} /></button>
+      {isMeetingEnded && (() => {
+        const agentMsgs = messages.filter(m => m.type === 'agent');
+        const userMsgs = messages.filter(m => m.type === 'me');
+        const downloadTranscript = () => {
+          const lines = messages.filter(m => m.type !== 'system' || m.sender === 'System').map(m => `[${m.time || '--:--'}] ${m.sender}: ${m.text}`).join('\n');
+          const blob = new Blob([`AGIOAS BOARDROOM TRANSCRIPT\n${'='.repeat(40)}\nDate: ${new Date().toLocaleDateString()}\n${'='.repeat(40)}\n\n${lines}`], { type: 'text/plain' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'boardroom_transcript.txt'; a.click();
+        };
+        const downloadMoM = () => {
+          const tasks = agentMsgs.slice(-5).map((m, i) => `${i + 1}. Action from ${m.sender}: "${m.text.substring(0, 100)}"`).join('\n');
+          const content = `AGIOAS BOARDROOM - MINUTES OF MEETING\n${'='.repeat(40)}\nDate: ${new Date().toLocaleDateString()}\nReason: ${endReason}\n${'='.repeat(40)}\n\nBOARD MEMBERS\n${boardMembers.map(m => `• ${m.name} (${m.role})`).join('\n')}\n\nDISCUSSION\n${agentMsgs.map(m => `[${m.sender}] ${m.text}`).join('\n\n')}\n\nACTION ITEMS\n${tasks}`;
+          const blob = new Blob([content], { type: 'text/plain' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'minutes_of_meeting.txt'; a.click();
+        };
+        const downloadReport = () => {
+          const topSpeakers = boardMembers.sort((a, b) => b.speakCount - a.speakCount).slice(0, 3).map(m => `• ${m.name}: ${m.speakCount} contributions (Conviction: ${m.conviction}%)`).join('\n');
+          const content = `AGIOAS BOARDROOM - EXECUTIVE REPORT\n${'='.repeat(40)}\nDate: ${new Date().toLocaleDateString()}\nSession End: ${endReason}\n${'='.repeat(40)}\n\nSTATISTICS\n• Board Responses: ${agentMsgs.length}\n• User Messages: ${userMsgs.length}\n• Total Exchanges: ${messages.length}\n\nTOP CONTRIBUTORS\n${topSpeakers}\n\nKEY HIGHLIGHTS\n${agentMsgs.slice(0, 5).map(m => `[${m.sender}]: ${m.text}`).join('\n\n')}`;
+          const blob = new Blob([content], { type: 'text/plain' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'executive_report.txt'; a.click();
+        };
+        return (
+          <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', zIndex: 3000 }}>
+            <div className="smooth-transition" style={{ width: '100%', maxWidth: 550, background: '#1A120E', border: `1px solid ${colors.border}`, borderRadius: 12, padding: 50, textAlign: 'center', boxShadow: '0 50px 100px rgba(0,0,0,1)', display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'scaleIn 0.5s ease' }}>
+              <img src="/logo.png" alt="AGIOAS" style={{ width: 48, height: 48, objectFit: 'contain', marginBottom: 24 }} />
+              <h1 className="cinzel-font" style={{ color: colors.textMain, fontSize: 32, marginBottom: 12, letterSpacing: '0.1em' }}>SESSION CONCLUDED</h1>
+              <div style={{ color: colors.gold, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 40 }}>{endReason}</div>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 40 }}>
+                <button onClick={downloadMoM} className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><FileText size={18} color={colors.gold} /> Minutes of Meeting (MoM)</div><Download size={16} color={colors.textDim} /></button>
+                <button onClick={downloadReport} className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><FileBarChart size={18} color={colors.gold} /> Executive Report & Task List</div><Download size={16} color={colors.textDim} /></button>
+                <button onClick={downloadTranscript} className="interactive-hover" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, cursor: 'pointer', fontSize: 14 }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><MessageSquare size={18} color={colors.gold} /> Full Transcript (TXT)</div><Download size={16} color={colors.textDim} /></button>
+              </div>
+              <button onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: 10, color: colors.textDim, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}><RefreshCcw size={14} /> NEW TIMELINE</button>
             </div>
-            <button onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: 10, color: colors.textDim, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}><RefreshCcw size={14} /> NEW TIMELINE</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- PAUSE OVERLAY --- */}
       {isPaused && (<div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeInBlur 0.3s forwards' }}><PauseCircle size={64} color={colors.gold} style={{ marginBottom: 20 }} /><h1 className="cinzel-font" style={{ color: colors.textMain, fontSize: 26, letterSpacing: '0.2em' }}>SESSION PAUSED</h1><button onClick={() => setIsPaused(false)} className="interactive-hover" style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 40px', background: colors.gold, border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700, color: '#1A120E', letterSpacing: '0.1em' }}><Play size={18} fill="currentColor" /> RESUME</button></div>)}
@@ -684,7 +725,7 @@ const BoardroomChat = ({ config, onBack }) => {
       <div style={{ height: 70, background: 'rgba(26, 18, 14, 0.95)', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, backdropFilter: 'blur(12px)', zIndex: 100, boxShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 32, height: 32, background: colors.goldGrad, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1A120E', fontWeight: 'bold' }}>A</div>
+            <img src="/logo.png" alt="AGIOAS" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <span className="cinzel-font" style={{ fontSize: 20, fontWeight: 700, color: colors.textMain, letterSpacing: '0.1em' }}>AGIOAS</span>
           </div>
           <div style={{ width: 1, height: 24, background: colors.border }}></div>

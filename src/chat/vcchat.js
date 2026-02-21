@@ -21,6 +21,18 @@ const config = {
   wsUrl: 'ws://localhost:8000'
 };
 
+// ─── LOGO — replace with your actual logo URL ────────────────────────────────
+const LOGO_IMG = "/logo.png"; // ← swap this path
+
+// ─── VC PROFILE IMAGES — add each character's photo URL here ─────────────────
+const VC_PROFILE_IMGS = {
+  "Arsit Rao": "/vc-profiles/arsit-rao.jpg",        // ← swap
+  "Harrison Cole": "/vc-profiles/harrison-cole.jpg",    // ← swap
+  "Sam Oberoi": "/vc-profiles/sam-oberoi.jpg",       // ← swap
+  "Sharad Singhania": "/vc-profiles/sharad-singhania.jpg", // ← swap
+  "Warren V.": "/vc-profiles/warren-v.jpg",         // ← swap
+};
+
 // Board members for VC simulation
 const boardMembers = [];
 
@@ -29,206 +41,291 @@ const onBack = () => {
   window.history.back();
 };
 const colors = {
-  gold: '#FFD700',       // Metallic Gold Leaf
-  goldDim: '#B8860B',    // Burnished Bronze
-  goldMid: '#DAA520',    // Satin Brass
-  goldBright: '#FFF8DC',  // Champagne Highlight
-  goldGrad: 'linear-gradient(135deg, #D4AF37 0%, #AF9462 50%, #8A6D3B 100%)',
-  textMain: '#FFFFFF',
-  textSecondary: '#F5DEB3', // Burnished Brass
-  textDim: '#D2B48C',    // Dark Umber
-  border: 'rgba(255, 215, 0, 0.3)', // Metallic Inlay
-  bgApp: '#2A1810',      // Obsidian Wood
-  bgSidebar: '#3D2517',  // Deep Walnut
-  bgCard: '#4A2F1E',     // Polished Oak
-  bgInput: '#1F1108',    // Charcoal Grain
-  chatShadow: 'rgba(212, 175, 55, 0.12)' // The Golden Halo
+  // --- EXECUTIVE SUITE (MAHOGANY & BRASS) — synced with Dashboard theme ---
+  gold: '#dc9a14',           // Aged Brass (was: Metallic Gold Leaf)
+  goldDim: '#ac8042',        // Polished Bronze (was: Burnished Bronze)
+  goldMid: '#dc9a14',        // Satin Brass
+  goldBright: '#ffd700',     // Champagne Highlight
+  goldGrad: 'linear-gradient(135deg, #9C7840 0%, #E8CD8C 50%, #9C7840 100%)',
+  textMain: '#E8E0D5',       // Parchment (was: pure white)
+  textSecondary: '#dc9a14',  // Aged Paper
+  textDim: '#a67c2e',        // Deep Bark (was: D2B48C)
+  border: 'rgba(196, 168, 111, 0.25)', // Gold Inlay (was: rgba(255,215,0,0.3))
+  bgApp: '#1c1410',          // Deepest Ebony Wood (was: #2A1810)
+  bgSidebar: '#1b110d',      // Dark Walnut (was: #3D2517)
+  bgCard: '#1e1610',         // Polished Mahogany (was: #4A2F1E)
+  bgInput: '#0c0908',        // Inset Dark Oak (was: #1F1108)
+  chatShadow: 'rgba(220, 154, 20, 0.12)', // Brass Halo
+  // extras used inside the component
+  deepBg: '#0F0A08',
+  darkGlass: 'rgba(29, 21, 16, 0.9)',
+  success: '#5D7A58',        // Moss
+  successDim: 'rgba(93, 122, 88, 0.15)',
+  danger: '#8A3A3A',         // Dried Blood / Red Wine
+  dangerDim: 'rgba(138, 58, 58, 0.2)',
+  warning: '#dc9a14',        // Brass
+  info: '#4F6170',           // Slate
 };
 const animationStyles = `
-  /* ✅ IMPORT PREMIUM FONTS */
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
   :root {
-    
-    /* PREMIUM GOLDEN SHADOWS */
-    --shadow-gold-sm: 0 2px 8px rgba(255, 215, 0, 0.2);
-    --shadow-gold-md: 0 4px 16px rgba(255, 215, 0, 0.3);
-    --shadow-gold-lg: 0 8px 32px rgba(255, 215, 0, 0.4);
-    --shadow-wood: 0 4px 12px rgba(42, 24, 16, 0.6);
-    --shadow-inset-wood: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    /* ═══ THE EXECUTIVE SUITE — MAHOGANY & BRASS ═══ */
+    --bg-app: #1c1410;
+    --bg-sidebar: #180f0b;
+    --bg-card: #211710;
+    --bg-input: #0d0806;
+    --bg-glass: rgba(24, 15, 11, 0.95);
 
-    --bg-app: #2A1810;
-    --text-heading: #FFFFFF;
-    --font-header: 'Cinzel', serif;
-    --font-body: 'Montserrat', sans-serif;
-    
-    /* THE GOLDEN SHADOW ENGINE */
-    --chat-glow: radial-gradient(
-      circle at 50% 50%, 
-      rgba(212, 175, 55, 0.12) 0%, 
-      rgba(42, 24, 16, 1) 85%
-    );
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
 
-    --gold-grad: background: linear-gradient(135deg, 
-      #B8860B 0%, 
-      #FFD700 20%, 
-      #FDB931 40%, 
-      #FFED4E 50%, 
-      #FDB931 60%, 
-      #FFD700 80%, 
-      #B8860B 100%);
-  }
+    --text-primary: #E8E0D5;
+    --text-secondary: #C4A96F;
+    --text-tertiary: #8a6b3a;
 
-  /* ✅ GLOBAL TYPOGRAPHY UPGRADE */
-  * {
-    font-family: var(--font-body);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+    --gold-dim: #ac8042;
+    --gold-mid: #dc9a14;
+    --gold-bright: #f5c842;
+    --gold-grad: linear-gradient(135deg, #8a6020 0%, #dc9a14 30%, #f0d080 50%, #dc9a14 70%, #8a6020 100%);
+    --gold-glow: 0 0 30px rgba(220, 154, 20, 0.2);
 
-  /* ✅ PREMIUM ETCHED GOLD HEADINGS */
-  h1, h2, h3, .section-title, .sidebar-title, .header-text {
-    font-family: var(--font-header) !important;
-    background: var(--gold-grad);
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    
-    /* Etched Boundary */
-    -webkit-text-stroke: 0.5px rgba(249, 229, 188, 0.3); 
-    
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 2px !important;
-    
-    text-shadow: 
-      0px 1px 0px rgba(255, 255, 255, 0.1), 
-      0px -1px 1px rgba(0, 0, 0, 0.8);
-      
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));
-  }
+    --success: #5D7A58;
+    --danger: #8A3A3A;
+    --info: #4F6170;
 
-  /* Sidebar Specific Font Refinement */
-  .sidebar-container span, .sidebar-item {
-    font-family: var(--font-body);
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    color: #F5DEB3;
-  }
+    --border-subtle: rgba(196, 168, 111, 0.08);
+    --border-gold: rgba(196, 168, 111, 0.22);
 
-  /* Message Bubble Typography */
-  .message-text {
-    font-family: var(--font-body);
-    line-height: 1.6;
-    font-weight: 400;
-  }
-
-  /* Custom Scrollbar, Animations, and Layout Layers remain unchanged... */
-
-  
-  /* PREMIUM WOOD GRAIN TEXTURE */
-  .wood-texture {
-    background-image: 
+    /* Premium wood grain — finer, more visible */
+    --wood-grain:
       repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.03) 0px,
-        rgba(0, 0, 0, 0.03) 1px,
-        transparent 1px,
-        transparent 3px
+        92deg,
+        rgba(139,100,55,0.04) 0px, rgba(139,100,55,0.04) 1px,
+        transparent 1px, transparent 5px
       ),
       repeating-linear-gradient(
-        0deg,
-        rgba(139, 115, 85, 0.05) 0px,
-        rgba(139, 115, 85, 0.05) 2px,
-        transparent 2px,
-        transparent 4px
+        1deg,
+        rgba(80,50,20,0.03) 0px, rgba(80,50,20,0.03) 1px,
+        transparent 1px, transparent 8px
       );
-  }
-  
-  /* GOLD METALLIC SHINE */
 
-  
-  /* BRILLIANT GOLD FOR STATS & NUMBERS */
-  .gold-text {
-    color: #FFD700;
-    font-weight: 700;
-    text-shadow: 
-      0 0 10px rgba(255, 215, 0, 0.6),
-      0 2px 4px rgba(0, 0, 0, 1);
-  }
-  
-  .bright-gold {
-    color: #FFED4E;
-    font-weight: 700;
-    text-shadow: 
-      0 0 15px rgba(255, 237, 78, 0.8),
-      0 2px 6px rgba(0, 0, 0, 1);
+    /* Geometric diamond lattice for chat bg */
+    --geo-pattern:
+      repeating-linear-gradient(
+        45deg,
+        rgba(196,168,111,0.03) 0px, rgba(196,168,111,0.03) 1px,
+        transparent 1px, transparent 28px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(196,168,111,0.03) 0px, rgba(196,168,111,0.03) 1px,
+        transparent 1px, transparent 28px
+      );
+
+    --ease-elegant: cubic-bezier(0.25, 1, 0.5, 1);
+    --chat-glow: radial-gradient(ellipse at 50% 0%, rgba(220,154,20,0.07) 0%, transparent 55%);
   }
 
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #0a0604; }
+  ::-webkit-scrollbar-thumb { background: #2a1c12; border: 1px solid #160e09; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+  /* ── TYPOGRAPHY ── */
+  * { font-family: var(--font-body); }
+  h1, h2, h3 { font-family: var(--font-display); color: var(--text-primary); font-weight: 500; letter-spacing: 0.04em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes goldShimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); filter: blur(3px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+  @keyframes msgEnter { from { opacity: 0; transform: scale(0.93) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  @keyframes msgPopIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes pulseSlow { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes blurIn { from { backdrop-filter: blur(0); opacity: 0; } to { backdrop-filter: blur(12px); opacity: 1; } }
+  @keyframes scaleUp { from { transform: scale(0.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes neuralPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.6; } }
+  @keyframes dotPulse { 0%,100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.4); opacity: 1; } }
+  @keyframes cursorBlink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes borderGlow {
+    0%,100% { box-shadow: 0 0 0 1px rgba(220,154,20,0.2), 0 4px 20px rgba(0,0,0,0.5); }
+    50% { box-shadow: 0 0 0 1px rgba(220,154,20,0.4), 0 4px 24px rgba(220,154,20,0.1); }
+  }
+
+  /* ── SIDEBAR TRANSITIONS ── */
+  .sidebar-open { width: 300px; transition: width 0.4s var(--ease-elegant); }
+  .sidebar-closed { width: 0; transition: width 0.4s var(--ease-elegant); }
+  .smooth-ease { transition: all 0.4s var(--ease-elegant); }
+
+  /* ── INTERACTIVE ── */
+  .interactive-btn { transition: all 0.25s var(--ease-elegant); cursor: pointer; }
+  .interactive-btn:hover { filter: brightness(1.1); }
+  .interactive-btn:active { transform: scale(0.97) !important; }
+  .thinking-active { animation: pulseSlow 1s infinite; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* ── GOLD UTILITIES ── */
+  .gold-text { color: #dc9a14; font-weight: 700; text-shadow: 0 0 12px rgba(220,154,20,0.4), 0 2px 4px rgba(0,0,0,0.9); }
+  .bright-gold { color: #f5c842; font-weight: 700; text-shadow: 0 0 16px rgba(245,200,66,0.5), 0 2px 6px rgba(0,0,0,0.9); }
   .gold-shine {
-    background: linear-gradient(135deg, 
-      #FFD700 0%, 
-      #FDB931 25%, 
-      #FFED4E 50%, 
-      #FDB931 75%, 
-      #B8860B 100%);
+    background: linear-gradient(135deg, #8a6020 0%, #dc9a14 25%, #f0d080 50%, #dc9a14 75%, #8a6020 100%);
     background-size: 200% 200%;
-    animation: goldShimmer 3s ease infinite;
-  }
-  
-  @keyframes goldShimmer {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  
-  /* RICH WOOD PANEL EFFECT */
-
-
-  /* HIGH CONTRAST SIDEBAR TEXT */
-  .sidebar-container, .vc-card, .investment-board {
-    color: #FFFFFF !important;
-  }
-  
-  .vc-name, .member-name, .stat-label {
-    color: #FFFFFF !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    font-weight: 600 !important;
-  }
-  
-  .vc-role, .member-role {
-    color: #F5DEB3 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  }
-  
-  .stat-value {
-    color: #FFD700 !important;
-    font-weight: 700 !important;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  }
-  
-  .percentage, .score-value {
-    color: #FFED4E !important;
-    font-weight: 700 !important;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 1);
+    animation: goldShimmer 4s ease infinite;
   }
 
-  .wood-panel {
-    background: linear-gradient(180deg, 
-      #4A2F1E 0%, 
-      #3D2517 50%, 
-      #2A1810 100%);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3),
-                inset 0 -2px 4px rgba(255, 215, 0, 0.1);
+  /* ── SHARED STAT CLASSES ── */
+  .vc-name, .member-name { color: #E8E0D5 !important; font-weight: 600 !important; }
+  .vc-role, .member-role { color: #dc9a14 !important; }
+  .stat-value { color: #dc9a14 !important; font-weight: 700 !important; }
+  .percentage, .score-value { color: #f5c842 !important; font-weight: 700 !important; }
+
+  /* ── APP-WIDE BACKGROUND — Deep mahogany, NOT black ── */
+  .app-root {
+    background:
+      var(--geo-pattern),
+      radial-gradient(ellipse at 20% 0%, rgba(100,60,20,0.18) 0%, transparent 45%),
+      radial-gradient(ellipse at 80% 100%, rgba(80,45,15,0.14) 0%, transparent 45%),
+      linear-gradient(160deg, #1e1510 0%, #150e0a 40%, #1a120d 100%);
   }
 
-  .mesh-gradient {
+  /* ── SIDEBAR — Full executive dark walnut panel ── */
+  .sidebar-panel {
+    background:
+      var(--wood-grain),
+      linear-gradient(180deg, #1d1209 0%, #160d08 50%, #130c07 100%);
+    border-right: 1px solid rgba(196,168,111,0.18);
+    box-shadow: 8px 0 50px rgba(0,0,0,0.7), inset -1px 0 0 rgba(196,168,111,0.06);
+    position: relative;
+  }
+  .sidebar-panel::before {
+    content: '';
     position: absolute;
-    inset: 0;
-    z-index: -2;
-    background: var(--bg-app);
-    background-image: var(--chat-glow);
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, rgba(220,154,20,0.5) 50%, transparent 100%);
+    pointer-events: none;
   }
+
+  /* ── SIDEBAR SECTION HEADER ── */
+  .sidebar-section-label {
+    font-family: var(--font-display);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    padding: 12px 16px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(196,168,111,0.2), transparent);
+  }
+
+  /* ── VC CARD — premium mahogany inlay ── */
+  .vc-card {
+    background:
+      linear-gradient(135deg, rgba(36,22,13,0.95) 0%, rgba(22,14,8,0.95) 100%);
+    border: 1px solid rgba(196,168,111,0.15);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s var(--ease-elegant);
+    animation: borderGlow 4s ease infinite;
+  }
+  .vc-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(220,154,20,0.35) 50%, transparent 100%);
+  }
+  .vc-card:hover {
+    border-color: rgba(196,168,111,0.32);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(220,154,20,0.1);
+    transform: translateY(-1px);
+  }
+
+  /* ── CHAT AREA BACKGROUND — mahogany with diamond lattice ── */
+  .chat-bg {
+    background:
+      var(--geo-pattern),
+      var(--chat-glow),
+      linear-gradient(180deg, #181009 0%, #120c07 100%);
+  }
+
+  /* ── HEADER ── */
+  .pitch-header {
+    background: linear-gradient(180deg, #110b07 0%, #181009 100%);
+    border-bottom: 1px solid rgba(196,168,111,0.2);
+    box-shadow: 0 4px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(220,154,20,0.08);
+  }
+
+  /* ── MESSAGE BUBBLES ── */
+  .message-bubble {
+    backdrop-filter: blur(8px);
+    transition: box-shadow 0.2s ease;
+  }
+  .message-bubble:hover { box-shadow: 0 4px 20px rgba(220,154,20,0.08) !important; }
+
+  /* ── SIDEBAR BUTTONS ── */
+  .sidebar-btn-primary {
+    background: linear-gradient(135deg, rgba(80,50,20,0.6) 0%, rgba(40,24,10,0.5) 100%);
+    border: 1px solid rgba(196,168,111,0.28);
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(220,154,20,0.1);
+    transition: all 0.25s var(--ease-elegant);
+  }
+  .sidebar-btn-primary:hover { filter: brightness(1.12); box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(220,154,20,0.15); }
+
+  /* ── INPUT PILL ── */
+  .pitch-input-pill {
+    background: linear-gradient(135deg, rgba(60,36,16,0.98) 0%, rgba(24,14,6,0.98) 100%);
+    border-radius: 32px;
+    box-shadow: 0 -1px 0 rgba(196,168,111,0.12), 0 12px 50px rgba(0,0,0,0.7);
+  }
+
+  /* ── SEND BUTTON ── */
+  .send-btn-glow {
+    background: linear-gradient(135deg, #9a6c10 0%, #dc9a14 40%, #f5c842 60%, #dc9a14 100%);
+    box-shadow: 0 4px 20px rgba(220,154,20,0.5), 0 0 0 1px rgba(220,154,20,0.25);
+    transition: all 0.25s var(--ease-elegant);
+  }
+  .send-btn-glow:hover:not(:disabled) { box-shadow: 0 6px 28px rgba(220,154,20,0.65), 0 0 0 2px rgba(220,154,20,0.35); transform: translateY(-1px); }
+
+  /* ── CONVICTION BAR ── */
+  .conviction-bar-bg { background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .conviction-bar-fill {
+    background: linear-gradient(90deg, #7a5010 0%, #dc9a14 60%, #f5d070 100%);
+    box-shadow: 0 0 8px rgba(220,154,20,0.5);
+    transition: width 0.8s ease;
+    border-radius: 3px;
+  }
+
+  /* ── STAGGER ── */
+  .fade-in { animation: fadeIn 0.7s var(--ease-elegant) forwards; opacity: 0; }
+  .stagger-appear { opacity: 0; animation: fadeIn 0.7s var(--ease-elegant) forwards; }
+  .delay-1 { animation-delay: 0.08s; } .delay-2 { animation-delay: 0.16s; }
+  .delay-3 { animation-delay: 0.24s; } .delay-4 { animation-delay: 0.32s; }
+  .delay-5 { animation-delay: 0.40s; }
+
+  /* ── MESH GRADIENT (legacy compat) ── */
+  .mesh-gradient { position: absolute; inset: 0; z-index: -2; pointer-events: none; background: var(--chat-glow); }
+  .executive-pattern { position: absolute; inset: 0; z-index: -1; pointer-events: none; background-image: var(--geo-pattern); opacity: 0.6; }
 `;
+
 // --- INITIAL DATA ---
 const INITIAL_MESSAGES = [
   { id: 1, sender: "System", text: "Pitch Simulation initialized. Real-time AI analysis active.", type: 'system' },
@@ -400,13 +497,18 @@ const VCAvatar = ({ vc, state, size = 40 }) => {
     return colors.info;
   };
 
+  // Resolve profile image: prefer vc.profileImg, then VC_PROFILE_IMGS lookup
+  const profileImg = vc.profileImg || VC_PROFILE_IMGS[vc.name] || null;
+  const [imgError, setImgError] = React.useState(false);
+  const showImg = profileImg && !imgError;
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', flexShrink: 0 }}>
       <div style={{
         width: size,
         height: size,
         borderRadius: '50%',
-        background: `linear-gradient(135deg, rgba(255,255,255,0.1), rgba(0,0,0,0.3))`,
+        background: showImg ? 'transparent' : `linear-gradient(135deg, rgba(60,36,14,0.95), rgba(28,16,6,0.95))`,
         border: `2px solid ${state ? getEngagementColor(state.engagement) : colors.border}`,
         display: 'flex',
         alignItems: 'center',
@@ -416,22 +518,33 @@ const VCAvatar = ({ vc, state, size = 40 }) => {
         fontWeight: 700,
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: `0 0 15px ${state ? getEngagementColor(state.engagement) + '40' : 'rgba(0,0,0,0.3)'}`
+        boxShadow: `0 0 15px ${state ? getEngagementColor(state.engagement) + '40' : 'rgba(0,0,0,0.3)'}, 0 2px 8px rgba(0,0,0,0.5)`
       }}>
-        {vc.initials || vc.name.split(' ').map(n => n[0]).join('')}
+        {showImg ? (
+          <img
+            src={profileImg}
+            alt={vc.name}
+            onError={() => setImgError(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'sepia(0.15) contrast(1.05)' }}
+          />
+        ) : (
+          <span style={{ fontFamily: 'Cinzel, serif', fontSize: size * 0.28, letterSpacing: '0.04em' }}>
+            {vc.initials || vc.name.split(' ').map(n => n[0]).join('')}
+          </span>
+        )}
 
         {/* Mood indicator */}
         {state && (
           <div style={{
             position: 'absolute',
-            bottom: 0,
-            right: 0,
-            width: 10,
-            height: 10,
+            bottom: 1,
+            right: 1,
+            width: Math.max(8, size * 0.22),
+            height: Math.max(8, size * 0.22),
             borderRadius: '50%',
             background: getMoodColor(state.mood || 0.5),
-            border: '2px solid rgba(0,0,0,0.5)',
-            boxShadow: `0 0 5px ${getMoodColor(state.mood || 0.5)}`
+            border: '2px solid rgba(0,0,0,0.7)',
+            boxShadow: `0 0 6px ${getMoodColor(state.mood || 0.5)}`
           }} />
         )}
       </div>
@@ -565,6 +678,25 @@ const InvestmentPitchRoom = () => {
   const [chartData, setChartData] = useState(null);
   const [convictionHistory, setConvictionHistory] = useState(new Array(15).fill(50));
 
+  // Membership limit modal
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitError, setLimitError] = useState('');
+
+  // VC Thinking steps
+  const VC_THINKING_STEPS = [
+    'Power-Law Awareness',
+    'Asymmetric Risk Evaluation',
+    'Market Size & Expansion Thinking',
+    'Pattern Recognition Across Startups',
+    'Timing Sensitivity',
+    'Competitive & Ecosystem Modeling',
+    'Portfolio Construction Logic',
+    'Second-Order & Capital Market Thinking',
+    'Incentive & Deal Structure Awareness',
+  ];
+  const [thinkingStep, setThinkingStep] = useState(0);
+  const thinkingIntervalRef = useRef(null);
+
   // Financial Visualization States
   const [currentRisk, setCurrentRisk] = useState(40);
   const [currentReturn, setCurrentReturn] = useState(60);
@@ -572,6 +704,19 @@ const InvestmentPitchRoom = () => {
 
   const chatEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  // Cycle through VC thinking steps while AI is generating
+  useEffect(() => {
+    if (isTyping) {
+      setThinkingStep(0);
+      thinkingIntervalRef.current = setInterval(() => {
+        setThinkingStep(prev => (prev + 1) % VC_THINKING_STEPS.length);
+      }, 600);
+    } else {
+      clearInterval(thinkingIntervalRef.current);
+    }
+    return () => clearInterval(thinkingIntervalRef.current);
+  }, [isTyping]);
 
   // --- ✅ UPGRADED: REST API CONNECTION ---
   // --- ✅ UPGRADED: AUTHENTICATED SESSION START ---
@@ -598,6 +743,7 @@ const InvestmentPitchRoom = () => {
             name: char.name,
             role: char.role,
             initials: char.name.split(' ').map(n => n[0]).join(''),
+            profileImg: char.profile_img || char.profileImg || VC_PROFILE_IMGS[char.name] || null,
             baseInterest: 50
           }));
           setVcPanel(backendVCs);
@@ -637,9 +783,9 @@ const InvestmentPitchRoom = () => {
           alert('Authentication required. Please log in again.');
           window.location.href = '/login';
         } else if (error.response?.status === 403) {
-          const errorMsg = error.response?.data?.error || 'Access denied';
-          alert(`Session start failed: ${errorMsg}\n\nPlease check your membership status.`);
-          if (onBack) onBack();
+          const errorMsg = error.response?.data?.error || 'Daily limit reached';
+          setLimitError(errorMsg);
+          setShowLimitModal(true);
         } else {
           console.warn('Using local simulation as fallback');
           initializeLocalSession();
@@ -668,11 +814,11 @@ const InvestmentPitchRoom = () => {
 
   const initializeLocalSession = () => {
     const localVCs = [
-      { id: 1, name: "Arsit Rao", role: "Lead Partner", initials: "AR", baseInterest: 50 },
-      { id: 2, name: "Harrison Cole", role: "Product Lead", initials: "HC", baseInterest: 50 },
-      { id: 3, name: "Sam Oberoi", role: "Growth Lead", initials: "SO", baseInterest: 50 },
-      { id: 4, name: "Sharad Singhania", role: "Finance Partner", initials: "SS", baseInterest: 50 },
-      { id: 5, name: "Warren V.", role: "Strategy Lead", initials: "WV", baseInterest: 50 },
+      { id: 1, name: "Arsit Rao", role: "Lead Partner", initials: "AR", profileImg: VC_PROFILE_IMGS["Arsit Rao"], baseInterest: 50 },
+      { id: 2, name: "Harrison Cole", role: "Product Lead", initials: "HC", profileImg: VC_PROFILE_IMGS["Harrison Cole"], baseInterest: 50 },
+      { id: 3, name: "Sam Oberoi", role: "Growth Lead", initials: "SO", profileImg: VC_PROFILE_IMGS["Sam Oberoi"], baseInterest: 50 },
+      { id: 4, name: "Sharad Singhania", role: "Finance Partner", initials: "SS", profileImg: VC_PROFILE_IMGS["Sharad Singhania"], baseInterest: 50 },
+      { id: 5, name: "Warren V.", role: "Strategy Lead", initials: "WV", profileImg: VC_PROFILE_IMGS["Warren V."], baseInterest: 50 },
     ];
 
     setVcPanel(localVCs);
@@ -856,10 +1002,15 @@ const InvestmentPitchRoom = () => {
     setTypingMemberId(randomVC?.id);
 
     try {
+      // ✅ FIX: Add auth token header to prevent 401 errors
+      const token = localStorage.getItem('agioas_token') || localStorage.getItem('auth_token') || '';
       // Call real backend API
       const response = await fetch(`${BACKEND_URL}/sessions/${sessionId}/chat/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ message: messageToSend })
       });
 
@@ -1070,12 +1221,11 @@ const InvestmentPitchRoom = () => {
     <div style={{
       position: 'absolute',
       inset: 0,
-      background: colors.deepBg,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
+      fontFamily: 'var(--font-body)'
+    }} className="app-root">
       <style>{animationStyles}</style>
 
       {/* --- CONFIRMATION MODAL --- */}
@@ -1090,6 +1240,27 @@ const InvestmentPitchRoom = () => {
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={() => setShowEndConfirm(false)} className="interactive-btn" style={{ flex: 1, padding: '12px 0', background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, fontWeight: 600 }}>Cancel</button>
               <button onClick={confirmEndSession} className="interactive-btn" style={{ flex: 1, padding: '12px 0', background: colors.danger, border: 'none', borderRadius: 6, color: '#fff', fontWeight: 600 }}>End Session</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MEMBERSHIP LIMIT MODAL --- */}
+      {showLimitModal && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'blurIn 0.3s forwards' }}>
+          <div style={{ width: 380, background: '#1A120E', border: `1px solid ${colors.gold}`, borderRadius: 14, padding: 32, display: 'flex', flexDirection: 'column', gap: 20, boxShadow: `0 0 60px rgba(255,215,0,0.2), 0 0 20px rgba(0,0,0,0.8)`, animation: 'scaleUp 0.3s ease', textAlign: 'center' }}>
+            <div style={{ fontSize: 40 }}>⏱️</div>
+            <div>
+              <h2 style={{ color: colors.textMain, margin: '0 0 8px 0', fontSize: 18, fontFamily: 'Cinzel, serif', letterSpacing: '0.05em' }}>Daily Limit Reached</h2>
+              <p style={{ color: colors.textDim, fontSize: 13, margin: '0 0 6px 0', lineHeight: 1.6 }}>{limitError}</p>
+              <p style={{ color: colors.textDim, fontSize: 12, margin: 0, lineHeight: 1.5 }}>Your daily VC simulation minutes are used up. Purchase additional VC minutes or wait until tomorrow.</p>
+            </div>
+            <div style={{ background: 'rgba(255,215,0,0.06)', border: `1px solid rgba(255,215,0,0.2)`, borderRadius: 8, padding: '12px 16px' }}>
+              <p style={{ color: colors.gold, fontSize: 12, margin: 0, fontWeight: 600 }}>💡 Tip: Buy a VC_ONLY plan to stack extra minutes on your current plan</p>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setShowLimitModal(false); if (onBack) onBack(); }} className="interactive-btn" style={{ flex: 1, padding: '11px 0', background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMain, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>← Go Back</button>
+              <button onClick={() => window.location.href = '/upgrade'} className="interactive-btn" style={{ flex: 1, padding: '11px 0', background: colors.goldGrad, border: 'none', borderRadius: 6, color: '#1A0E06', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Upgrade Plan</button>
             </div>
           </div>
         </div>
@@ -1136,13 +1307,13 @@ const InvestmentPitchRoom = () => {
 
       {/* --- END SCREEN --- */}
       {isMeetingEnded && (
-        <div style={{ position: 'absolute', inset: 0, background: '#0F0A08', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', zIndex: 3000, animation: 'blurIn 0.8s forwards' }}>
-          <div className="smooth-ease" style={{ width: '100%', maxWidth: 500, background: 'rgba(20, 20, 25, 0.8)', border: `1px solid ${colors.goldDim}`, borderRadius: 20, padding: 40, textAlign: 'center', boxShadow: `0 30px 80px ${colors.goldDim}`, backdropFilter: 'blur(20px)', animation: 'scaleUp 0.6s cubic-bezier(0.19, 1, 0.22, 1)', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, background: '#0A0705', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', zIndex: 3000, animation: 'blurIn 0.8s forwards' }}>
+          <div className="smooth-ease" style={{ width: '100%', maxWidth: 500, background: 'linear-gradient(180deg, rgba(26,18,14,0.95) 0%, rgba(15,10,8,0.95) 100%)', border: `1px solid rgba(196,168,111,0.3)`, borderRadius: 20, padding: 40, textAlign: 'center', boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(220,154,20,0.08), inset 0 1px 0 rgba(220,154,20,0.1)`, backdropFilter: 'blur(20px)', animation: 'scaleUp 0.6s cubic-bezier(0.19, 1, 0.22, 1)', position: 'relative' }}>
             <button onClick={() => setIsMeetingEnded(false)} className="interactive-btn" style={{ position: 'absolute', top: 20, right: 20, background: 'transparent', border: 'none', color: '#D2B48C', cursor: 'pointer', zIndex: 10 }}><X size={24} /></button>
             <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(212, 175, 104, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, margin: '0 auto 24px auto', border: `2px solid ${colors.gold}` }}>
               <CheckCircle size={40} color={colors.gold} />
             </div>
-            <h1 style={{ color: colors.textMain, fontFamily: 'serif', fontSize: 32, marginBottom: 8, letterSpacing: '-0.02em' }}>Pitch Concluded</h1>
+            <h1 style={{ color: colors.textMain, fontFamily: 'Cinzel, serif', fontSize: 28, marginBottom: 8, letterSpacing: '0.06em', fontWeight: 500 }}>Pitch Concluded</h1>
             <div style={{ color: colors.gold, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 30, letterSpacing: '0.15em' }}>{endReason}</div>
 
             {/* Download Options */}
@@ -1186,33 +1357,46 @@ const InvestmentPitchRoom = () => {
 
       {/* --- HEADER --- */}
       <div style={{
-        height: 60,
-        background: 'rgba(0,0,0,0.4)',
-        borderBottom: `1px solid ${colors.border}`,
+        height: 72,
+        background: 'linear-gradient(180deg, rgba(14, 9, 6, 0.99) 0%, rgba(20,13,9,0.95) 100%)',
+        borderBottom: `1px solid rgba(196, 168, 111, 0.25)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
+        padding: '0 32px',
         flexShrink: 0,
-        backdropFilter: 'blur(12px)',
+        backdropFilter: 'blur(20px)',
         zIndex: 100,
-        position: 'relative'
+        position: 'relative',
+        boxShadow: '0 4px 40px rgba(0,0,0,0.5), 0 1px 0 rgba(220,154,20,0.1)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* LOGO — replace LOGO_IMG path at top of file */}
+            <img
+              src={LOGO_IMG}
+              alt="Logo"
+              style={{
+                height: 36,
+                width: 'auto',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 2px 6px rgba(220,154,20,0.25))',
+              }}
+              onError={(e) => {
+                // fallback to gold hex if logo fails to load
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            {/* Fallback icon shown only if logo fails */}
             <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
+              display: 'none', width: 36, height: 36, borderRadius: '50%',
               background: 'linear-gradient(135deg, #D4AF68, #8B6B2C)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              alignItems: 'center', justifyContent: 'center',
               border: `2px solid ${colors.gold}`
             }}>
               <Brain size={20} color="#000" />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, color: colors.textMain, letterSpacing: '0.1em', fontFamily: 'serif' }}>AGIOAS AI</span>
           </div>
           <div style={{ width: 1, height: 24, background: colors.border }}></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1237,7 +1421,7 @@ const InvestmentPitchRoom = () => {
             <Clock size={16} />
             <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 13 }}>{formatTime(sessionTime)}</span>
           </div>
-          <button onClick={triggerEndSession} className="interactive-btn" style={{ padding: '8px 16px', background: 'rgba(138, 58, 58, 0.2)', border: `1px solid ${colors.danger}`, color: '#fff', borderRadius: 4, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><PhoneOff size={14} /> END</button>
+          <button onClick={triggerEndSession} className="interactive-btn" style={{ padding: '8px 18px', background: 'linear-gradient(135deg, rgba(138, 58, 58, 0.3) 0%, rgba(100,30,30,0.2) 100%)', border: `1px solid rgba(138,58,58,0.5)`, color: '#e8a0a0', borderRadius: 6, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, letterSpacing: '0.08em', boxShadow: '0 2px 8px rgba(138,58,58,0.2)' }}><PhoneOff size={14} /> END SESSION</button>
         </div>
       </div>
 
@@ -1264,28 +1448,25 @@ const InvestmentPitchRoom = () => {
         </button>
 
         {/* SIDEBAR */}
-        <div className={`smooth-ease ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} style={{
-          background: 'rgba(15, 10, 8, 0.6)',
-          borderRight: `1px solid ${colors.border}`,
+        <div className={`smooth-ease sidebar-panel ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} style={{
           display: 'flex',
           flexDirection: 'column',
-          backdropFilter: 'blur(10px)',
           flexShrink: 0,
           overflow: 'hidden',
           zIndex: 10
         }}>
 
-          {/* --- SIDEBAR HEADER BUTTONS (FROM SCREENSHOT) --- */}
-          <div style={{ padding: '24px 16px 12px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* --- SIDEBAR HEADER BUTTONS --- */}
+          <div style={{ padding: '16px 14px 12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* EXECUTIVE PAUSE BUTTON */}
             <button
               onClick={() => setIsPaused(true)}
               className="interactive-btn"
               style={{
                 width: '100%',
-                padding: '12px',
-                background: 'rgba(74, 47, 30, 0.5)',
-                border: `1px solid ${colors.border}`,
+                padding: '13px',
+                background: 'linear-gradient(135deg, rgba(74, 47, 30, 0.6) 0%, rgba(42, 24, 16, 0.5) 100%)',
+                border: `1px solid rgba(196, 168, 111, 0.3)`,
                 borderRadius: 8,
                 color: colors.gold,
                 display: 'flex',
@@ -1293,9 +1474,11 @@ const InvestmentPitchRoom = () => {
                 justifyContent: 'center',
                 gap: 10,
                 textTransform: 'uppercase',
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: 700,
-                letterSpacing: '0.1em'
+                letterSpacing: '0.12em',
+                fontFamily: 'Cinzel, serif',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(220,154,20,0.1)'
               }}
             >
               <Coffee size={16} /> EXECUTIVE PAUSE
@@ -1346,8 +1529,8 @@ const InvestmentPitchRoom = () => {
               style={{
                 width: '100%',
                 padding: '14px',
-                background: 'rgba(93, 122, 88, 0.05)',
-                border: `1px solid ${colors.successDim}`,
+                background: 'linear-gradient(135deg, rgba(93, 122, 88, 0.1) 0%, rgba(60,90,55,0.06) 100%)',
+                border: `1px solid rgba(93, 122, 88, 0.3)`,
                 borderRadius: 8,
                 color: '#9EBA9A',
                 display: 'flex',
@@ -1355,9 +1538,11 @@ const InvestmentPitchRoom = () => {
                 justifyContent: 'center',
                 gap: 12,
                 textTransform: 'uppercase',
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: 800,
-                letterSpacing: '0.15em'
+                letterSpacing: '0.15em',
+                fontFamily: 'Cinzel, serif',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(93,122,88,0.15)'
               }}
             >
               <Shield size={16} /> INTELLIGENCE REPORT
@@ -1365,21 +1550,25 @@ const InvestmentPitchRoom = () => {
           </div>
 
           <div style={{
-            padding: '10px 16px',
-            color: '#D2B48C',
-            fontSize: 11,
+            padding: '8px 12px',
+            fontSize: 9,
             fontWeight: 700,
             textTransform: 'uppercase',
+            letterSpacing: '0.18em',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            borderTop: `1px solid ${colors.border}`
+            color: colors.goldDim,
+            fontFamily: 'Cinzel, serif',
+            borderTop: `1px solid rgba(196,168,111,0.12)`,
+            marginTop: 4
           }}>
-            <Users size={14} /> Investment Board
+            <Users size={12} color={colors.goldDim} /> Investment Board
+            <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(196,168,111,0.2), transparent)' }} />
           </div>
 
           {/* VC LIST */}
-          <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+          <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {vcPanel.map((vc, i) => {
               const state = vcStates[vc.id] || {};
               const interest = state.interest || 50;
@@ -1392,39 +1581,37 @@ const InvestmentPitchRoom = () => {
               if (interest > 70) barColor = colors.success;
 
               return (
-                <div key={vc.id} className={`${typingMemberId === vc.id ? 'thinking-active' : ''}`} style={{
-                  padding: '8px 4px',
-                  marginBottom: 4,
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                <div key={vc.id} className={`vc-card ${typingMemberId === vc.id ? 'thinking-active' : ''}`} style={{
+                  padding: '10px 12px',
                   animation: `slideInRight 0.3s ease forwards ${i * 0.05}s`,
                   opacity: 0
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <VCAvatar vc={vc} state={state} size={32} />
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                      <div style={{ fontSize: 12, color: colors.textMain, fontWeight: 600 }}>{vc.name}</div>
-                      <div style={{ fontSize: 9, color: '#D2B48C' }}>{vc.role}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: colors.textMain, fontWeight: 600, fontFamily: 'Cinzel, serif', letterSpacing: '0.04em', lineHeight: 1.3 }}>{vc.name}</div>
+                      <div style={{ fontSize: 9, color: colors.gold, opacity: 0.75, marginTop: 1 }}>{vc.role}</div>
                     </div>
                   </div>
 
                   {/* Interest Bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div className="conviction-bar-fill" style={{
                         width: `${interest}%`,
                         height: '100%',
-                        background: barColor,
-                        transition: 'width 0.8s ease'
+                        background: interest < 30 ? colors.danger : interest > 70 ? colors.success : undefined,
+                        boxShadow: interest < 30 ? `0 0 6px ${colors.danger}80` : undefined
                       }}></div>
                     </div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: barColor, width: 24, textAlign: 'right' }}>{Math.round(interest)}%</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: barColor, width: 26, textAlign: 'right', fontFamily: 'monospace' }}>{Math.round(interest)}%</div>
                   </div>
 
                   {/* Additional Metrics */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 8, color: '#D2B48C' }}>
-                    <span>Conviction: {Math.round(conviction)}%</span>
-                    <span>Engage: {Math.round(engagement * 100)}%</span>
-                    {frustration > 20 && <span style={{ color: colors.danger }}>Frust: {Math.round(frustration)}%</span>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(196,168,111,0.5)', letterSpacing: '0.02em' }}>
+                    <span>CONV {Math.round(conviction)}%</span>
+                    <span>ENG {Math.round(engagement * 100)}%</span>
+                    {frustration > 20 && <span style={{ color: `${colors.danger}cc` }}>FRUS {Math.round(frustration)}%</span>}
                   </div>
                 </div>
               );
@@ -1440,10 +1627,7 @@ const InvestmentPitchRoom = () => {
         </div>
 
         {/* CHAT AREA WITH GOLDEN EXECUTIVE THEME */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', background: colors.bgInput }}>
-          {/* Golden Mesh Gradient Background */}
-          <div className="mesh-gradient" />
-
+        <div className="chat-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
           {/* Executive SVG Pattern Overlay */}
           <div className="executive-pattern" />
 
@@ -1472,12 +1656,12 @@ const InvestmentPitchRoom = () => {
                 }}>
                   {msg.type === 'system' && (
                     <div style={{
-                      background: 'rgba(212, 175, 104, 0.08)',
+                      background: 'linear-gradient(135deg, rgba(220,154,20,0.08) 0%, rgba(196,168,111,0.05) 100%)',
                       borderRadius: 20,
-                      padding: '6px 16px',
+                      padding: '6px 18px',
                       fontSize: 11,
                       color: colors.gold,
-                      border: `1px solid ${colors.goldDim}`,
+                      border: `1px solid rgba(196,168,111,0.2)`,
                       fontFamily: 'monospace',
                       backdropFilter: 'blur(10px)',
                       letterSpacing: '0.05em'
@@ -1570,9 +1754,9 @@ const InvestmentPitchRoom = () => {
                 gap: 12,
                 padding: '12px 16px',
                 animation: 'msgPopIn 0.3s ease-out',
-                background: 'rgba(185, 149, 80, 0.05)', // ✅ Slight highlight
+                background: 'rgba(185, 149, 80, 0.05)',
                 borderRadius: 8,
-                border: `1px solid rgba(185, 149, 80, 0.15)` // ✅ Border for visibility
+                border: `1px solid rgba(185, 149, 80, 0.15)`
               }}>
                 <div style={{
                   width: 40,
@@ -1584,40 +1768,68 @@ const InvestmentPitchRoom = () => {
                   justifyContent: 'center',
                   fontSize: 14,
                   fontWeight: 600,
-                  color: colors.textDark,
-                  boxShadow: '0 0 20px rgba(185, 149, 80, 0.4)' // ✅ Glow effect
+                  color: '#1A0E06',
+                  boxShadow: '0 0 20px rgba(185, 149, 80, 0.4)',
+                  flexShrink: 0
                 }}>
-                  {boardMembers.find(m => m.id === typingMemberId)?.initials}
+                  {(vcPanel.find(m => m.id === typingMemberId) || boardMembers.find(m => m.id === typingMemberId))?.initials || '⚡'}
                 </div>
                 <div style={{
                   flex: 1,
                   background: colors.bgCard,
                   borderRadius: 8,
-                  padding: '12px 16px',
+                  padding: '10px 14px',
                   border: `1px solid ${colors.border}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
                 }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[0, 1, 2].map(i => (
-                      <div key={i} style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: colors.gold,
-                        animation: `dotPulse 1.4s infinite ease-in-out ${i * 0.2}s`,
-                        boxShadow: '0 0 10px rgba(185, 149, 80, 0.6)' // ✅ Dot glow
-                      }} />
-                    ))}
+                  {/* VC Thinking framework label */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: colors.gold,
+                          animation: `dotPulse 1.4s infinite ease-in-out ${i * 0.2}s`,
+                          boxShadow: '0 0 8px rgba(255, 215, 0, 0.6)'
+                        }} />
+                      ))}
+                    </div>
+                    <span style={{ color: colors.textDim, fontSize: 11, fontStyle: 'italic', letterSpacing: '0.02em' }}>
+                      {(vcPanel.find(m => m.id === typingMemberId) || { name: 'VC Panel' }).name} is evaluating...
+                    </span>
                   </div>
-                  <span style={{
-                    color: colors.textDim,
-                    fontSize: 13,
-                    fontStyle: 'italic'
+                  {/* Cycling thinking step */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 8px',
+                    background: 'rgba(255,215,0,0.06)',
+                    borderRadius: 4,
+                    border: '1px solid rgba(255,215,0,0.12)',
+                    transition: 'all 0.3s ease',
+                    animation: 'msgPopIn 0.3s ease-out'
                   }}>
-                    {boardMembers.find(m => m.id === typingMemberId)?.name} is thinking...
-                  </span>
+                    <div style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: colors.gold,
+                      flexShrink: 0,
+                      boxShadow: '0 0 6px rgba(255,215,0,0.8)',
+                      animation: 'dotPulse 1s infinite ease-in-out'
+                    }} />
+                    <span style={{
+                      color: colors.gold,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      letterSpacing: '0.03em',
+                      fontFamily: 'Montserrat, sans-serif'
+                    }}>
+                      {VC_THINKING_STEPS[thinkingStep]}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1636,14 +1848,14 @@ const InvestmentPitchRoom = () => {
             zIndex: 2
           }}>
             <div className="interactive-btn" style={{
-              background: 'linear-gradient(135deg, rgba(74, 47, 30, 0.95) 0%, rgba(42, 24, 16, 0.95) 100%)',
+              background: 'linear-gradient(135deg, rgba(74, 47, 30, 0.97) 0%, rgba(28, 16, 8, 0.97) 100%)',
               borderRadius: 30,
-              border: isInputFocused ? `1px solid ${colors.gold}` : `1px solid ${colors.goldDim}`,
+              border: isInputFocused ? `1px solid ${colors.gold}` : `1px solid rgba(196, 168, 111, 0.3)`,
               display: 'flex',
               alignItems: 'center',
               padding: '8px 8px 8px 24px',
-              backdropFilter: 'blur(20px)',
-              boxShadow: isInputFocused ? `0 0 30px ${colors.goldDim}` : '0 10px 40px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(24px)',
+              boxShadow: isInputFocused ? `0 0 0 1px rgba(220,154,20,0.3), 0 8px 40px rgba(220,154,20,0.12), 0 20px 60px rgba(0,0,0,0.5)` : '0 10px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(220,154,20,0.08)',
               transform: isInputFocused ? 'translateY(-2px)' : 'translateY(0)',
               transition: 'all 0.4s ease'
             }}>
@@ -1680,14 +1892,14 @@ const InvestmentPitchRoom = () => {
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    background: colors.gold,
+                    background: `linear-gradient(135deg, #dc9a14 0%, #f0b830 50%, #dc9a14 100%)`,
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#1A120E',
-                    boxShadow: `0 4px 15px ${colors.goldDim}`,
-                    opacity: (!inputText.trim() || isMeetingEnded || isPaused || isOnBreak) ? 0.5 : 1,
+                    boxShadow: `0 4px 16px rgba(220,154,20,0.5), 0 0 0 1px rgba(220,154,20,0.2)`,
+                    opacity: (!inputText.trim() || isMeetingEnded || isPaused || isOnBreak) ? 0.4 : 1,
                     cursor: (!inputText.trim() || isMeetingEnded || isPaused || isOnBreak) ? 'not-allowed' : 'pointer'
                   }}
                 >
